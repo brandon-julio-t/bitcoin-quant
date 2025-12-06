@@ -211,7 +211,8 @@ export default function BitcoinChart({
       {/* Main Price Chart with Stochastic Oscillator in Panes */}
       <div className="bg-card rounded-lg p-4 border space-y-6">
         <h2 className="text-xl font-bold text-card-foreground mb-4 text-center">
-          Bitcoin (BTC-USD) with Stochastic Oscillator & Fear and Greed Index
+          Bitcoin (BTC-USD) with Volume, Stochastic Oscillator & Fear and Greed
+          Index
         </h2>
         <CandlestickChart
           data={chartData}

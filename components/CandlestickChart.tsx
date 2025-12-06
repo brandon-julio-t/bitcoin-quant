@@ -7,6 +7,8 @@ import {
   ColorType,
   createChart,
   createSeriesMarkers,
+  HistogramData,
+  HistogramSeries,
   IChartApi,
   ISeriesApi,
   ISeriesMarkersPluginApi,
@@ -65,6 +67,7 @@ export default function CandlestickChart({
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const ema13SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const ema21SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
@@ -152,6 +155,25 @@ export default function CandlestickChart({
 
     // Create markers instance for the candlestick series
     markersRef.current = createSeriesMarkers(candlestickSeries, []);
+
+    // Volume histogram overlaid on price pane for immediate context
+    const volumeSeries = chart.addSeries(HistogramSeries, {
+      color: "rgba(148, 163, 184, 0.6)",
+      priceFormat: { type: "volume" },
+      priceLineVisible: false,
+      lastValueVisible: false,
+      priceScaleId: "volume",
+    });
+    volumeSeriesRef.current = volumeSeries;
+
+    // Keep price readable by squeezing volume to bottom of the main pane
+    chart.priceScale("volume").applyOptions({
+      scaleMargins: {
+        top: 0.75,
+        bottom: 0,
+      },
+      visible: false,
+    });
 
     // Notify parent component that series is ready
     if (onSeriesReady) {
@@ -443,7 +465,9 @@ export default function CandlestickChart({
 
     // Configure all pane heights after series creation
     const panes = chart.panes();
-    panes[0].setStretchFactor(3);
+    panes[0]?.setStretchFactor(3);
+    panes[1]?.setStretchFactor(1.2);
+    panes[2]?.setStretchFactor(1);
 
     // Handle resize
     const handleResize = () => {
@@ -479,6 +503,7 @@ export default function CandlestickChart({
     const bbUpperData: LineData<Time>[] = [];
     const bbMiddleData: LineData<Time>[] = [];
     const bbLowerData: LineData<Time>[] = [];
+    const volumeData: HistogramData<Time>[] = [];
     const stochasticKData: LineData<Time>[] = [];
     const stochasticDData: LineData<Time>[] = [];
     const stochasticOverboughtData: LineData<Time>[] = [];
@@ -519,6 +544,16 @@ export default function CandlestickChart({
       if (point.ema100 !== null) {
         ema100Data.push({ time: timestamp, value: point.ema100 });
       }
+
+      const volumeColor =
+        point.close >= point.open
+          ? "rgba(38, 166, 154, 0.2)"
+          : "rgba(239, 83, 80, 0.2)";
+      volumeData.push({
+        time: timestamp,
+        value: point.volume,
+        color: volumeColor,
+      });
 
       // For Bollinger Bands: in logarithmic mode, filter out values <= 0
       // to prevent breaking the logarithmic scale rendering
@@ -579,6 +614,7 @@ export default function CandlestickChart({
     bbUpperSeriesRef.current?.setData(bbUpperData);
     bbMiddleSeriesRef.current?.setData(bbMiddleData);
     bbLowerSeriesRef.current?.setData(bbLowerData);
+    volumeSeriesRef.current?.setData(volumeData);
     stochasticKSeriesRef.current?.setData(stochasticKData);
     stochasticDSeriesRef.current?.setData(stochasticDData);
     stochasticOverboughtLineRef.current?.setData(stochasticOverboughtData);
