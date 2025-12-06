@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
 import { calculateAllIndicators, OHLCV } from "@/lib/indicators";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useMemo, useState } from "react";
 
@@ -42,18 +42,42 @@ async function fetchBitcoinData(timeframe: string): Promise<OHLCV[]> {
   return bitcoinData;
 }
 
-export default function Home() {
-  const [timeframe, setTimeframe] = useState("1m");
+const TIMEFRAMES = ["1d", "1w", "1m"] as const;
 
-  const {
-    data: bitcoinData,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ["bitcoin", timeframe],
-    queryFn: () => fetchBitcoinData(timeframe),
-    staleTime: 1000 * 60 * 5, // 5 minutes - data stays fresh for 5 minutes
+export default function Home() {
+  const [timeframe, setTimeframe] = useState<(typeof TIMEFRAMES)[number]>("1m");
+
+  // Load all timeframes in parallel for instant switching
+  const timeframeQueries = useQueries({
+    queries: TIMEFRAMES.map((tf) => ({
+      queryKey: ["bitcoin", tf],
+      queryFn: () => fetchBitcoinData(tf),
+      staleTime: 1000 * 60 * 5, // 5 minutes - data stays fresh for 5 minutes
+    })),
   });
+
+  // Create a map of timeframe to query result for easy access
+  const timeframeDataMap = useMemo(() => {
+    const map = new Map<
+      string,
+      { data?: OHLCV[]; isLoading: boolean; error: Error | null }
+    >();
+    TIMEFRAMES.forEach((tf, index) => {
+      const query = timeframeQueries[index];
+      map.set(tf, {
+        data: query.data,
+        isLoading: query.isLoading,
+        error: query.error as Error | null,
+      });
+    });
+    return map;
+  }, [timeframeQueries]);
+
+  // Get the current timeframe's data
+  const currentTimeframeData = timeframeDataMap.get(timeframe);
+  const bitcoinData = currentTimeframeData?.data;
+  const isLoading = currentTimeframeData?.isLoading ?? false;
+  const error = currentTimeframeData?.error ?? null;
 
   const indicators = useMemo(() => {
     if (!bitcoinData) return null;
@@ -67,7 +91,21 @@ export default function Home() {
           Bitcoin Quant Indicators
         </h1>
 
-        <ChartControls timeframe={timeframe} onTimeframeChange={setTimeframe} />
+        <ChartControls
+          timeframe={timeframe}
+          onTimeframeChange={(tf) => {
+            const validTimeframe = TIMEFRAMES.find((t) => t === tf);
+            if (validTimeframe) {
+              setTimeframe(validTimeframe);
+            }
+          }}
+          loadingStates={Object.fromEntries(
+            TIMEFRAMES.map((tf, index) => [
+              tf,
+              timeframeQueries[index].isLoading,
+            ])
+          )}
+        />
 
         {isLoading && (
           <Empty className="border">

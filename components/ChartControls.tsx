@@ -1,18 +1,19 @@
 "use client";
 
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 
 interface ChartControlsProps {
   timeframe: string;
   onTimeframeChange: (timeframe: string) => void;
+  loadingStates?: Record<string, boolean>;
 }
+
+const TIMEFRAMES = [
+  { value: "1d", label: "1 Day" },
+  { value: "1w", label: "1 Week" },
+  { value: "1m", label: "1 Month" },
+] as const;
 
 /**
  * ChartControls component for selecting chart timeframe
@@ -21,25 +22,33 @@ interface ChartControlsProps {
 export default function ChartControls({
   timeframe,
   onTimeframeChange,
+  loadingStates = {},
 }: ChartControlsProps) {
   return (
     <div className="space-y-4 mb-6">
-      <FieldGroup className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Field>
-          <FieldLabel htmlFor="timeframe-select">Timeframe</FieldLabel>
-          <Select value={timeframe} onValueChange={onTimeframeChange}>
-            <SelectTrigger id="timeframe-select" className="w-full">
-              <SelectValue placeholder="Select timeframe" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="4h">4 Hours</SelectItem>
-              <SelectItem value="1d">1 Day</SelectItem>
-              <SelectItem value="1w">1 Week</SelectItem>
-              <SelectItem value="1m">1 Month</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-      </FieldGroup>
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium text-foreground">Timeframe</label>
+        <div className="flex gap-2">
+          {TIMEFRAMES.map((tf) => {
+            const isLoading = loadingStates[tf.value] ?? false;
+            return (
+              <Button
+                key={tf.value}
+                variant={timeframe === tf.value ? "default" : "outline"}
+                onClick={() => onTimeframeChange(tf.value)}
+                className="flex-1 relative"
+              >
+                <span className="flex items-center justify-center gap-2">
+                  {isLoading && (
+                    <Spinner className="size-3" aria-label="Loading" />
+                  )}
+                  {tf.label}
+                </span>
+              </Button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

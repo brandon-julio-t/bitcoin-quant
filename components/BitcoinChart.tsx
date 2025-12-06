@@ -15,12 +15,14 @@ import {
   ColorType,
   createChart,
   IChartApi,
+  IRange,
   ISeriesApi,
   LineData,
   LineSeries,
+  MouseEventParams,
   Time,
 } from "lightweight-charts";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type RefObject } from "react";
 import CandlestickChart from "./CandlestickChart";
 
 interface BitcoinChartProps {
@@ -47,6 +49,9 @@ interface BitcoinChartProps {
  */
 function StochasticChart({
   data,
+  btcChartRef,
+  onChartReady,
+  onSeriesReady,
 }: {
   data: Array<{
     date: string;
@@ -54,6 +59,9 @@ function StochasticChart({
     stochasticK: number | null;
     stochasticD: number | null;
   }>;
+  btcChartRef?: RefObject<IChartApi | null>;
+  onChartReady?: (chart: IChartApi) => void;
+  onSeriesReady?: (series: ISeriesApi<"Line">) => void;
 }) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -147,6 +155,14 @@ function StochasticChart({
     });
     kSeriesRef.current = kSeries;
 
+    // Notify parent component that chart and series are ready
+    if (onChartReady) {
+      onChartReady(chart);
+    }
+    if (onSeriesReady) {
+      onSeriesReady(kSeries);
+    }
+
     // Create %D series
     const dSeries = chart.addSeries(LineSeries, {
       color: "rgba(255, 152, 0, 1)",
@@ -179,6 +195,7 @@ function StochasticChart({
         chartRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update chart data when data prop changes
@@ -218,6 +235,108 @@ function StochasticChart({
     chartRef.current.timeScale().fitContent();
   }, [data]);
 
+  // Synchronize time scale bidirectionally between BTC and Stochastic charts
+  useEffect(() => {
+    if (!btcChartRef?.current || !chartRef.current) return;
+
+    const btcChart = btcChartRef.current;
+    const stochasticChart = chartRef.current;
+    const isSyncingFromBtcRef = { current: false }; // Prevent loop when syncing from BTC
+    const isSyncingFromStochasticRef = { current: false }; // Prevent loop when syncing from Stochastic
+
+    // Handler for BTC chart time range changes -> sync to Stochastic
+    const handleBtcTimeRangeChange = (timeRange: IRange<Time> | null) => {
+      if (
+        timeRange &&
+        !isSyncingFromBtcRef.current &&
+        !isSyncingFromStochasticRef.current
+      ) {
+        isSyncingFromBtcRef.current = true;
+        try {
+          // Get current stochastic chart time range to avoid unnecessary updates
+          const currentRange = stochasticChart.timeScale().getVisibleRange();
+          if (
+            !currentRange ||
+            currentRange.from !== timeRange.from ||
+            currentRange.to !== timeRange.to
+          ) {
+            // Sync the stochastic chart's visible time range with BTC chart
+            if (timeRange.to !== null) {
+              stochasticChart.timeScale().setVisibleRange({
+                from: timeRange.from,
+                to: timeRange.to,
+              });
+            } else {
+              // If to is null, use fitContent
+              stochasticChart.timeScale().fitContent();
+            }
+          }
+        } finally {
+          // Reset flag after a short delay to allow the change to propagate
+          window.setTimeout(() => {
+            isSyncingFromBtcRef.current = false;
+          }, 10);
+        }
+      }
+    };
+
+    // Handler for Stochastic chart time range changes -> sync to BTC
+    const handleStochasticTimeRangeChange = (
+      timeRange: IRange<Time> | null
+    ) => {
+      if (
+        timeRange &&
+        !isSyncingFromStochasticRef.current &&
+        !isSyncingFromBtcRef.current
+      ) {
+        isSyncingFromStochasticRef.current = true;
+        try {
+          // Get current BTC chart time range to avoid unnecessary updates
+          const currentRange = btcChart.timeScale().getVisibleRange();
+          if (
+            !currentRange ||
+            currentRange.from !== timeRange.from ||
+            currentRange.to !== timeRange.to
+          ) {
+            // Sync the BTC chart's visible time range with Stochastic chart
+            if (timeRange.to !== null) {
+              btcChart.timeScale().setVisibleRange({
+                from: timeRange.from,
+                to: timeRange.to,
+              });
+            } else {
+              // If to is null, use fitContent
+              btcChart.timeScale().fitContent();
+            }
+          }
+        } finally {
+          // Reset flag after a short delay to allow the change to propagate
+          window.setTimeout(() => {
+            isSyncingFromStochasticRef.current = false;
+          }, 10);
+        }
+      }
+    };
+
+    // Subscribe to both charts' visible time range changes
+    btcChart
+      .timeScale()
+      .subscribeVisibleTimeRangeChange(handleBtcTimeRangeChange);
+    stochasticChart
+      .timeScale()
+      .subscribeVisibleTimeRangeChange(handleStochasticTimeRangeChange);
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      btcChart
+        .timeScale()
+        .unsubscribeVisibleTimeRangeChange(handleBtcTimeRangeChange);
+      stochasticChart
+        .timeScale()
+        .unsubscribeVisibleTimeRangeChange(handleStochasticTimeRangeChange);
+    };
+  }, [btcChartRef]);
+
   return (
     <div
       ref={chartContainerRef}
@@ -232,6 +351,13 @@ function StochasticChart({
  * and stochastic oscillator
  */
 export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
+  const btcChartRef = useRef<IChartApi | null>(null);
+  const stochasticChartRef = useRef<IChartApi | null>(null);
+  const btcCandlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(
+    null
+  );
+  const stochasticKSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+
   const chartData = useMemo(() => {
     if (!data.length) return [];
 
@@ -343,6 +469,116 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
     });
   }, [data, indicators]);
 
+  const priceMin = Math.min(...data.map((d) => d.low));
+  const priceMax = Math.max(...data.map((d) => d.high));
+
+  // Synchronize crosshair between BTC and Stochastic charts
+  useEffect(() => {
+    if (
+      !btcChartRef.current ||
+      !stochasticChartRef.current ||
+      !btcCandlestickSeriesRef.current ||
+      !stochasticKSeriesRef.current
+    ) {
+      return;
+    }
+
+    const btcChart = btcChartRef.current;
+    const stochasticChart = stochasticChartRef.current;
+    const btcSeries = btcCandlestickSeriesRef.current;
+    const stochasticSeries = stochasticKSeriesRef.current;
+    const isSyncingRef = { current: false };
+
+    // Handler for BTC chart crosshair move
+    const handleBtcCrosshairMove = (param: MouseEventParams) => {
+      if (isSyncingRef.current || !param.time) return;
+
+      isSyncingRef.current = true;
+      try {
+        // Get price from stochastic series at the same time
+        const stochasticData = param.seriesData.get(stochasticSeries);
+        let stochasticPrice: number | null = null;
+
+        if (stochasticData) {
+          const data = stochasticData as unknown;
+          if (
+            typeof data === "object" &&
+            data !== null &&
+            "value" in data &&
+            typeof (data as { value: unknown }).value === "number"
+          ) {
+            stochasticPrice = (data as { value: number }).value;
+          }
+        }
+
+        if (stochasticPrice !== null) {
+          // Set crosshair on stochastic chart at the same time
+          stochasticChart.setCrosshairPosition(
+            stochasticPrice,
+            param.time,
+            stochasticSeries
+          );
+        } else {
+          // If no price data, still set the time position (price will be auto-calculated)
+          stochasticChart.setCrosshairPosition(0, param.time, stochasticSeries);
+        }
+      } finally {
+        setTimeout(() => {
+          isSyncingRef.current = false;
+        }, 0);
+      }
+    };
+
+    // Handler for Stochastic chart crosshair move
+    const handleStochasticCrosshairMove = (param: MouseEventParams) => {
+      if (isSyncingRef.current || !param.time) return;
+
+      isSyncingRef.current = true;
+      try {
+        // Get price from BTC candlestick series at the same time
+        const btcData = param.seriesData.get(btcSeries);
+        let btcPrice: number | null = null;
+
+        if (btcData) {
+          const data = btcData as unknown;
+          if (
+            typeof data === "object" &&
+            data !== null &&
+            "close" in data &&
+            typeof (data as { close: unknown }).close === "number"
+          ) {
+            btcPrice = (data as { close: number }).close;
+          }
+        }
+
+        if (btcPrice !== null) {
+          // Set crosshair on BTC chart at the same time
+          btcChart.setCrosshairPosition(btcPrice, param.time, btcSeries);
+        } else {
+          // If no price data, still set the time position (price will be auto-calculated)
+          btcChart.setCrosshairPosition(0, param.time, btcSeries);
+        }
+      } finally {
+        setTimeout(() => {
+          isSyncingRef.current = false;
+        }, 0);
+      }
+    };
+
+    // Subscribe to crosshair movements
+    btcChart.subscribeCrosshairMove(handleBtcCrosshairMove);
+    stochasticChart.subscribeCrosshairMove(handleStochasticCrosshairMove);
+
+    // Note: Lightweight Charts doesn't have a direct "crosshair leave" event,
+    // but clearing happens automatically when the crosshair moves outside the chart area
+
+    // Cleanup subscriptions
+    return () => {
+      btcChart.unsubscribeCrosshairMove(handleBtcCrosshairMove);
+      stochasticChart.unsubscribeCrosshairMove(handleStochasticCrosshairMove);
+    };
+  }, []);
+
   if (!chartData.length) {
     return (
       <Empty className="border">
@@ -357,9 +593,6 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
     );
   }
 
-  const priceMin = Math.min(...data.map((d) => d.low));
-  const priceMax = Math.max(...data.map((d) => d.high));
-
   return (
     <div className="space-y-4">
       {/* Main Price Chart */}
@@ -371,6 +604,12 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
           data={chartData}
           priceMin={priceMin}
           priceMax={priceMax}
+          onChartReady={(chart) => {
+            btcChartRef.current = chart;
+          }}
+          onSeriesReady={(series) => {
+            btcCandlestickSeriesRef.current = series;
+          }}
         />
 
         {/* Stochastic Oscillator */}
@@ -378,7 +617,16 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
           <h3 className="text-lg font-semibold text-card-foreground mb-2 text-center">
             Stochastic Oscillator
           </h3>
-          <StochasticChart data={chartData} />
+          <StochasticChart
+            data={chartData}
+            btcChartRef={btcChartRef}
+            onChartReady={(chart) => {
+              stochasticChartRef.current = chart;
+            }}
+            onSeriesReady={(series) => {
+              stochasticKSeriesRef.current = series;
+            }}
+          />
         </div>
       </div>
     </div>

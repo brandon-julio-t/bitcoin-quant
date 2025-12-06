@@ -35,7 +35,6 @@ export async function GET(request: NextRequest) {
   try {
     // Map intervals to Yahoo Finance format
     const intervalMap: Record<string, string> = {
-      "4h": "1h",
       "1d": "1d",
       "1w": "1wk",
       "1m": "1mo",
@@ -87,11 +86,6 @@ export async function GET(request: NextRequest) {
       }))
       .filter((point) => point.open > 0 && point.close > 0);
 
-    // Resample to 4h if needed
-    if (interval === "4h") {
-      return NextResponse.json(resampleTo4H(dataPoints));
-    }
-
     return NextResponse.json(dataPoints);
   } catch (error) {
     console.error("Error fetching Bitcoin data:", error);
@@ -100,41 +94,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-function resampleTo4H(dataPoints: BitcoinDataPoint[]): BitcoinDataPoint[] {
-  // Group by 4-hour intervals
-  const grouped = new Map<string, BitcoinDataPoint[]>();
-
-  dataPoints.forEach((point) => {
-    const date = new Date(point.date);
-    // Round down to nearest 4-hour mark
-    const hours = date.getHours();
-    const roundedHours = Math.floor(hours / 4) * 4;
-    const key = new Date(date.setHours(roundedHours, 0, 0, 0)).toISOString();
-
-    if (!grouped.has(key)) {
-      grouped.set(key, []);
-    }
-    grouped.get(key)!.push(point);
-  });
-
-  // Aggregate each group
-  const resampled: BitcoinDataPoint[] = [];
-  grouped.forEach((points, key) => {
-    if (points.length === 0) return;
-
-    resampled.push({
-      date: key,
-      open: points[0].open,
-      high: Math.max(...points.map((p) => p.high)),
-      low: Math.min(...points.map((p) => p.low)),
-      close: points[points.length - 1].close,
-      volume: points.reduce((sum, p) => sum + p.volume, 0),
-    });
-  });
-
-  return resampled.sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
 }

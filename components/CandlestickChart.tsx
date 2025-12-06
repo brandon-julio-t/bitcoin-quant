@@ -39,6 +39,8 @@ interface CandlestickChartProps {
   }>;
   priceMin: number;
   priceMax: number;
+  onChartReady?: (chart: IChartApi) => void;
+  onSeriesReady?: (series: ISeriesApi<"Candlestick">) => void;
 }
 
 /**
@@ -49,6 +51,8 @@ export default function CandlestickChart({
   data,
   priceMin,
   priceMax,
+  onChartReady,
+  onSeriesReady,
 }: CandlestickChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -95,6 +99,11 @@ export default function CandlestickChart({
 
     chartRef.current = chart;
 
+    // Notify parent component that chart is ready
+    if (onChartReady) {
+      onChartReady(chart);
+    }
+
     // Create candlestick series
     const candlestickSeries = chart.addSeries(CandlestickSeries, {
       upColor: "#26a69a",
@@ -109,6 +118,11 @@ export default function CandlestickChart({
       },
     });
     candlestickSeriesRef.current = candlestickSeries;
+
+    // Notify parent component that series is ready
+    if (onSeriesReady) {
+      onSeriesReady(candlestickSeries);
+    }
 
     // Create EMA series
     const ema13Series = chart.addSeries(LineSeries, {
