@@ -1,5 +1,3 @@
-import { NextResponse } from "next/server";
-
 /**
  * Bitcoin halving constants
  * Halvings occur every 210,000 blocks starting at block 210,000
@@ -45,6 +43,9 @@ interface BlockData {
  * Returns the height of the latest block in the blockchain
  */
 async function fetchCurrentBlockHeight(): Promise<number> {
+  console.log(
+    `[${new Date().toISOString()}] 🏔️ Fetching current Bitcoin block height from Mempool.space...`
+  );
   try {
     const response = await fetch(
       "https://mempool.space/api/blocks/tip/height",
@@ -55,16 +56,30 @@ async function fetchCurrentBlockHeight(): Promise<number> {
       }
     );
 
+    console.log(
+      `[${new Date().toISOString()}] 📡 Block height response status: ${response.status}`
+    );
+
     if (!response.ok) {
+      console.error(
+        `[${new Date().toISOString()}] ❌ Failed to fetch current block height: ${response.status} ${response.statusText}`
+      );
       throw new Error(
         `Failed to fetch current block height: ${response.statusText}`
       );
     }
 
     const heightText = await response.text();
-    return parseInt(heightText, 10);
+    const height = parseInt(heightText, 10);
+    console.log(
+      `[${new Date().toISOString()}] 📊 Current Bitcoin block height: ${height}`
+    );
+    return height;
   } catch (error) {
-    console.error("Error fetching current block height:", error);
+    console.error(
+      `[${new Date().toISOString()}] 💥 Error fetching current block height:`,
+      error
+    );
     throw error;
   }
 }
@@ -74,6 +89,9 @@ async function fetchCurrentBlockHeight(): Promise<number> {
  * Returns null if block doesn't exist (future halving)
  */
 async function fetchBlockHash(blockHeight: number): Promise<string | null> {
+  console.log(
+    `[${new Date().toISOString()}] 🔍 Fetching block hash for height ${blockHeight}...`
+  );
   try {
     const response = await fetch(
       `https://mempool.space/api/block-height/${blockHeight}`,
@@ -84,17 +102,34 @@ async function fetchBlockHash(blockHeight: number): Promise<string | null> {
       }
     );
 
+    console.log(
+      `[${new Date().toISOString()}] 📡 Block hash response status: ${response.status} for height ${blockHeight}`
+    );
+
     if (!response.ok) {
       // If block doesn't exist yet (future halving), return null
       if (response.status === 404) {
+        console.log(
+          `[${new Date().toISOString()}] ⏳ Block ${blockHeight} doesn't exist yet (future halving)`
+        );
         return null;
       }
+      console.error(
+        `[${new Date().toISOString()}] ❌ Blockstream API error for height ${blockHeight}: ${response.status} ${response.statusText}`
+      );
       throw new Error(`Blockstream API error: ${response.statusText}`);
     }
 
-    return await response.text();
+    const hash = await response.text();
+    console.log(
+      `[${new Date().toISOString()}] 🔗 Block ${blockHeight} hash: ${hash.substring(0, 16)}...`
+    );
+    return hash;
   } catch (error) {
-    console.error(`Error fetching block hash for block ${blockHeight}:`, error);
+    console.error(
+      `[${new Date().toISOString()}] 💥 Error fetching block hash for block ${blockHeight}:`,
+      error
+    );
     throw error;
   }
 }
@@ -103,6 +138,10 @@ async function fetchBlockHash(blockHeight: number): Promise<string | null> {
  * Fetch block details including timestamp for a given block hash
  */
 async function fetchBlockDetails(blockHash: string): Promise<BlockData> {
+  console.log(
+    `[${new Date().toISOString()}] 📦 Fetching block details for hash ${blockHash.substring(0, 16)}...`
+  );
+
   const blockResponse = await fetch(
     `https://mempool.space/api/block/${blockHash}`,
     {
@@ -112,21 +151,39 @@ async function fetchBlockDetails(blockHash: string): Promise<BlockData> {
     }
   );
 
+  console.log(
+    `[${new Date().toISOString()}] 📡 Block details response status: ${blockResponse.status} for hash ${blockHash.substring(0, 16)}...`
+  );
+
   if (!blockResponse.ok) {
+    console.error(
+      `[${new Date().toISOString()}] ❌ Failed to fetch block details for ${blockHash.substring(0, 16)}...: ${blockResponse.status} ${blockResponse.statusText}`
+    );
     throw new Error(
       `Failed to fetch block details: ${blockResponse.statusText}`
     );
   }
 
-  return await blockResponse.json();
+  const blockData = await blockResponse.json();
+  console.log(
+    `[${new Date().toISOString()}] 📊 Block ${blockData.height} mined at ${new Date(blockData.timestamp * 1000).toISOString()}`
+  );
+
+  return blockData;
 }
 
 /**
- * Fetch halving dates from Blockstream API
- * Uses actual block timestamps for accurate halving dates
- * Optimized to fetch blocks in parallel and avoid 404s by checking current block height first
+ * Fetch halving dates directly (bypassing HTTP layer)
+ * Same logic as /api/halving-dates but called as a function
  */
-export async function GET() {
+export async function fetchHalvingDatesDirect(): Promise<{
+  halvingDates: string[];
+}> {
+  const startTime = Date.now();
+  console.log(
+    `[${new Date().toISOString()}] 📅 Starting halving dates fetch...`
+  );
+
   try {
     const halvingDates: Date[] = [];
     const now = new Date();
@@ -139,11 +196,21 @@ export async function GET() {
       (blockHeight) => blockHeight <= currentBlockHeight
     );
 
+    console.log(
+      `[${new Date().toISOString()}] 📋 Found ${existingHalvingBlocks.length} existing halving blocks out of ${HALVING_BLOCKS.length} total`
+    );
+
     if (existingHalvingBlocks.length === 0) {
+      console.error(
+        `[${new Date().toISOString()}] ❌ No halving dates could be fetched - no existing blocks`
+      );
       throw new Error("No halving dates could be fetched");
     }
 
     // Fetch all block hashes in parallel (these should all exist, avoiding 404s)
+    console.log(
+      `[${new Date().toISOString()}] 🔄 Fetching ${existingHalvingBlocks.length} block hashes in parallel...`
+    );
     const blockHashPromises = existingHalvingBlocks.map((blockHeight) =>
       fetchBlockHash(blockHeight)
     );
@@ -154,15 +221,29 @@ export async function GET() {
       (hash): hash is string => hash !== null
     );
 
+    console.log(
+      `[${new Date().toISOString()}] ✅ Retrieved ${validBlockHashes.length} valid block hashes`
+    );
+
     if (validBlockHashes.length === 0) {
+      console.error(
+        `[${new Date().toISOString()}] ❌ No valid block hashes found`
+      );
       throw new Error("No halving dates could be fetched");
     }
 
     // Fetch all block details in parallel
+    console.log(
+      `[${new Date().toISOString()}] 🔄 Fetching ${validBlockHashes.length} block details in parallel...`
+    );
     const blockDetailsPromises = validBlockHashes.map((blockHash) =>
       fetchBlockDetails(blockHash)
     );
     const blockDetailsArray = await Promise.all(blockDetailsPromises);
+
+    console.log(
+      `[${new Date().toISOString()}] 📊 Processing ${blockDetailsArray.length} block details`
+    );
 
     // Convert timestamps to dates and filter out future dates
     for (const blockData of blockDetailsArray) {
@@ -170,25 +251,41 @@ export async function GET() {
 
       // If date is in the future, stop processing (early return optimization)
       if (halvingDate > now) {
+        console.log(
+          `[${new Date().toISOString()}] ⏸️ Stopping at future halving date: ${halvingDate.toISOString()}`
+        );
         break;
       }
 
       halvingDates.push(halvingDate);
     }
 
+    console.log(
+      `[${new Date().toISOString()}] 📅 Found ${halvingDates.length} past halving dates`
+    );
+
     if (halvingDates.length === 0) {
+      console.error(
+        `[${new Date().toISOString()}] ❌ No past halving dates found`
+      );
       throw new Error("No halving dates could be fetched");
     }
 
     // Convert Date objects to ISO strings for JSON serialization
     const halvingDatesISO = halvingDates.map((date) => date.toISOString());
 
-    return NextResponse.json({ halvingDates: halvingDatesISO });
-  } catch (error) {
-    console.error("Error fetching halving dates:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch halving dates" },
-      { status: 500 }
+    const duration = Date.now() - startTime;
+    console.log(
+      `[${new Date().toISOString()}] ✅ Halving dates fetch completed in ${duration}ms with ${halvingDatesISO.length} dates`
     );
+
+    return { halvingDates: halvingDatesISO };
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(
+      `[${new Date().toISOString()}] 💥 Halving dates fetch failed after ${duration}ms:`,
+      error
+    );
+    throw error;
   }
 }

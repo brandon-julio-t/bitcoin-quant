@@ -1,6 +1,5 @@
-"use client";
-
 import BitcoinChart from "@/components/BitcoinChart";
+import { PageLayout } from "@/components/PageLayout";
 import {
   Empty,
   EmptyDescription,
@@ -9,194 +8,206 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { calculateAllIndicators, OHLCV } from "@/lib/indicators";
-import { useQueries, useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { useMemo } from "react";
+import { TIMEFRAME_LABELS, TIMEFRAMES } from "@/lib/constants";
+import { fetchBitcoinDataDirect } from "@/lib/fetch-bitcoin";
+import { fetchFearGreedDataDirect } from "@/lib/fetch-fear-greed";
+import { fetchHalvingDatesDirect } from "@/lib/fetch-halving-dates";
+import { calculateAllIndicators } from "@/lib/indicators";
 
-/**
- * Bitcoin genesis block date: January 3, 2009
- * This is when Bitcoin was created
- */
-const BITCOIN_BIRTH_DATE = "2009-01-03";
+// Enable ISR with 1 hour revalidation in production, 1 second in development for fast updates
+// Enable ISR: 1 second for development (fast updates), change to 3600 for production
+export const revalidate = 3600;
 
-async function fetchBitcoinData(timeframe: string): Promise<OHLCV[]> {
-  const now = format(new Date(), "yyyy-MM-dd");
-  const params = new URLSearchParams({
-    interval: timeframe,
-    startDate: BITCOIN_BIRTH_DATE,
-    endDate: now,
-  });
+export default async function Home() {
+  console.log(
+    `[${new Date().toISOString()}] 🚀 Starting page render on ${process.platform} with Node ${process.version}`
+  );
 
-  const response = await fetch(`/api/bitcoin?${params}`);
-  if (!response.ok) {
-    throw new Error("Failed to fetch Bitcoin data");
-  }
+  // Fetch all data on the server (direct function calls, no HTTP overhead)
+  console.log(
+    `[${new Date().toISOString()}] 📡 Starting parallel data fetches...`
+  );
 
-  const bitcoinData: OHLCV[] = await response.json();
-  if (bitcoinData.length === 0) {
-    throw new Error("No data available");
-  }
+  const start = new Date();
 
-  return bitcoinData;
-}
+  const [
+    bitcoinData1d,
+    bitcoinData1w,
+    bitcoinData1m,
+    halvingDatesData,
+    fearGreedData,
+  ] = await Promise.all([
+    fetchBitcoinDataDirect("1d")
+      .catch((error) => {
+        console.error(
+          `[${new Date().toISOString()}] ❌ Bitcoin 1d fetch failed:`,
+          error
+        );
+        return [];
+      })
+      .finally(() => {
+        console.log(
+          `[${new Date().toISOString()}] ⏱️ Bitcoin 1d fetch completed in ${new Date().getTime() - start.getTime()}ms`
+        );
+      }),
+    fetchBitcoinDataDirect("1w")
+      .catch((error) => {
+        console.error(
+          `[${new Date().toISOString()}] ❌ Bitcoin 1w fetch failed:`,
+          error
+        );
+        return [];
+      })
+      .finally(() => {
+        console.log(
+          `[${new Date().toISOString()}] ⏱️ Bitcoin 1w fetch completed in ${new Date().getTime() - start.getTime()}ms`
+        );
+      }),
+    fetchBitcoinDataDirect("1m")
+      .catch((error) => {
+        console.error(
+          `[${new Date().toISOString()}] ❌ Bitcoin 1m fetch failed:`,
+          error
+        );
+        return [];
+      })
+      .finally(() => {
+        console.log(
+          `[${new Date().toISOString()}] ⏱️ Bitcoin 1m fetch completed in ${new Date().getTime() - start.getTime()}ms`
+        );
+      }),
+    fetchHalvingDatesDirect()
+      .catch((error) => {
+        console.error(
+          `[${new Date().toISOString()}] ❌ Halving dates fetch failed:`,
+          error
+        );
+        return { halvingDates: [] };
+      })
+      .finally(() => {
+        console.log(
+          `[${new Date().toISOString()}] ⏱️ Halving dates fetch completed in ${new Date().getTime() - start.getTime()}ms`
+        );
+      }),
+    fetchFearGreedDataDirect()
+      .catch((error) => {
+        console.error(
+          `[${new Date().toISOString()}] ❌ Fear & Greed fetch failed:`,
+          error
+        );
+        return [];
+      })
+      .finally(() => {
+        console.log(
+          `[${new Date().toISOString()}] ⏱️ Fear & Greed fetch completed in ${new Date().getTime() - start.getTime()}ms`
+        );
+      }),
+  ]);
 
-const TIMEFRAMES = ["1d", "1w", "1m"] as const;
-
-const TIMEFRAME_LABELS: Record<(typeof TIMEFRAMES)[number], string> = {
-  "1d": "1 Day",
-  "1w": "1 Week",
-  "1m": "1 Month",
-};
-
-export default function Home() {
-  // Load all timeframes in parallel for instant switching
-  const timeframeQueries = useQueries({
-    queries: TIMEFRAMES.map((tf) => ({
-      queryKey: ["bitcoin", tf],
-      queryFn: () => fetchBitcoinData(tf),
-      staleTime: 1000 * 60 * 5, // 5 minutes - data stays fresh for 5 minutes
-    })),
-  });
-
-  // Load halving dates in parallel with bitcoin data
-  const {
-    data: halvingDatesData,
-    isLoading: isLoadingHalvingDates,
-    error: halvingDatesError,
-  } = useQuery<{ halvingDates: string[] }>({
-    queryKey: ["halving-dates"],
-    queryFn: async () => {
-      const response = await fetch("/api/halving-dates");
-      if (!response.ok) {
-        throw new Error("Failed to fetch halving dates");
-      }
-      return response.json();
-    },
-    staleTime: 1000 * 60 * 60 * 24, // 24 hours - halving dates don't change often
-  });
-
-  // Load Fear and Greed Index data in parallel
-  const { data: fearGreedData } = useQuery<
-    Array<{ date: string; value: number; classification: string }>
-  >({
-    queryKey: ["fear-greed"],
-    queryFn: async () => {
-      const response = await fetch("/api/fear-greed");
-      if (!response.ok) {
-        throw new Error("Failed to fetch Fear and Greed data");
-      }
-      return response.json();
-    },
-    staleTime: 1000 * 60 * 60, // 1 hour - fear and greed updates daily
+  console.log(`[${new Date().toISOString()}] ✅ All fetches completed`);
+  console.log(`[${new Date().toISOString()}] 📊 Data received:`, {
+    bitcoin1d: bitcoinData1d.length,
+    bitcoin1w: bitcoinData1w.length,
+    bitcoin1m: bitcoinData1m.length,
+    halvingDates: halvingDatesData.halvingDates.length,
+    fearGreed: fearGreedData.length,
   });
 
   // Calculate indicators for each timeframe
-  const indicatorsMap = useMemo(() => {
-    const map = new Map<string, ReturnType<typeof calculateAllIndicators>>();
-    TIMEFRAMES.forEach((tf, index) => {
-      const query = timeframeQueries[index];
-      if (query.data) {
-        map.set(tf, calculateAllIndicators(query.data));
-      }
-    });
-    return map;
-  }, [timeframeQueries]);
+  const indicatorsMap = new Map<
+    string,
+    ReturnType<typeof calculateAllIndicators>
+  >();
+  if (bitcoinData1d.length > 0) {
+    indicatorsMap.set("1d", calculateAllIndicators(bitcoinData1d));
+  }
+  if (bitcoinData1w.length > 0) {
+    indicatorsMap.set("1w", calculateAllIndicators(bitcoinData1w));
+  }
+  if (bitcoinData1m.length > 0) {
+    indicatorsMap.set("1m", calculateAllIndicators(bitcoinData1m));
+  }
 
   // Create a map of Fear and Greed data by date for quick lookup
-  const fearGreedMap = useMemo(() => {
-    if (!fearGreedData)
-      return new Map<string, { value: number; classification: string }>();
-    const map = new Map<string, { value: number; classification: string }>();
-    fearGreedData.forEach((point) => {
-      // Normalize date to YYYY-MM-DD format for matching
-      const dateKey = new Date(point.date).toISOString().split("T")[0];
-      map.set(dateKey, {
-        value: point.value,
-        classification: point.classification,
-      });
+  const fearGreedMap = new Map<
+    string,
+    { value: number; classification: string }
+  >();
+  fearGreedData.forEach((point) => {
+    // Normalize date to YYYY-MM-DD format for matching
+    const dateKey = new Date(point.date).toISOString().split("T")[0];
+    fearGreedMap.set(dateKey, {
+      value: point.value,
+      classification: point.classification,
     });
-    return map;
-  }, [fearGreedData]);
+  });
+
+  const timeframeData = {
+    "1d": bitcoinData1d,
+    "1w": bitcoinData1w,
+    "1m": bitcoinData1m,
+  };
 
   return (
-    <main className="min-h-screen bg-background text-foreground p-4 md:p-8">
-      <div className="container mx-auto">
-        <h1 className="text-3xl md:text-4xl font-bold text-center mb-8">
-          Bitcoin Quant Indicators
-        </h1>
+    <PageLayout>
+      <Tabs defaultValue="1m" className="w-full">
+        <Field>
+          <FieldLabel>Timeframe</FieldLabel>
+          <TabsList>
+            {TIMEFRAMES.map((tf) => (
+              <TabsTrigger key={tf} value={tf}>
+                {TIMEFRAME_LABELS[tf]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Field>
 
-        <Tabs defaultValue="1m" className="w-full">
-          <Field>
-            <FieldLabel>Timeframe</FieldLabel>
-            <TabsList>
-              {TIMEFRAMES.map((tf, index) => {
-                const isLoading = timeframeQueries[index].isLoading;
-                return (
-                  <TabsTrigger key={tf} value={tf} className="relative">
-                    {isLoading && (
-                      <Spinner className="size-3 mr-1.5" aria-label="Loading" />
-                    )}
-                    {TIMEFRAME_LABELS[tf]}
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
-          </Field>
+        {TIMEFRAMES.map((tf) => {
+          const bitcoinData = timeframeData[tf];
+          const indicators = indicatorsMap.get(tf);
 
-          {TIMEFRAMES.map((tf, index) => {
-            const query = timeframeQueries[index];
-            const bitcoinData = query.data;
-            const isLoading = query.isLoading;
-            const error = query.error as Error | null;
-            const indicators = indicatorsMap.get(tf);
-
-            return (
-              <TabsContent key={tf} value={tf}>
-                {isLoading && (
-                  <Empty className="border">
-                    <EmptyHeader>
-                      <EmptyMedia>
-                        <Spinner />
-                      </EmptyMedia>
-                      <EmptyTitle>Loading chart data</EmptyTitle>
-                      <EmptyDescription>
-                        Please wait while we fetch the latest Bitcoin data...
-                      </EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                )}
-
-                {error && (
-                  <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-md mb-4">
-                    <strong>Error:</strong>{" "}
-                    {error instanceof Error
-                      ? error.message
-                      : "An error occurred"}
-                  </div>
-                )}
-
-                {!isLoading &&
-                  !error &&
-                  bitcoinData &&
-                  bitcoinData.length > 0 &&
-                  indicators && (
-                    <BitcoinChart
-                      data={bitcoinData}
-                      indicators={indicators}
-                      halvingDates={halvingDatesData?.halvingDates}
-                      isLoadingHalvingDates={isLoadingHalvingDates}
-                      halvingDatesError={halvingDatesError}
-                      fearGreedData={fearGreedMap}
-                    />
-                  )}
-              </TabsContent>
-            );
-          })}
-        </Tabs>
-      </div>
-    </main>
+          return (
+            <TabsContent key={tf} value={tf}>
+              {bitcoinData.length === 0 ? (
+                <Empty className="border">
+                  <EmptyHeader>
+                    <EmptyMedia>
+                      <div className="text-muted-foreground">⚠️</div>
+                    </EmptyMedia>
+                    <EmptyTitle>Failed to load chart data</EmptyTitle>
+                    <EmptyDescription>
+                      Unable to fetch Bitcoin data for {TIMEFRAME_LABELS[tf]}.
+                      Please try again later.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : indicators ? (
+                <BitcoinChart
+                  data={bitcoinData}
+                  indicators={indicators}
+                  halvingDates={halvingDatesData.halvingDates}
+                  isLoadingHalvingDates={false}
+                  halvingDatesError={null}
+                  fearGreedData={fearGreedMap}
+                />
+              ) : (
+                <Empty className="border">
+                  <EmptyHeader>
+                    <EmptyMedia>
+                      <div className="text-muted-foreground">📊</div>
+                    </EmptyMedia>
+                    <EmptyTitle>Processing data</EmptyTitle>
+                    <EmptyDescription>
+                      Calculating indicators for {TIMEFRAME_LABELS[tf]}...
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )}
+            </TabsContent>
+          );
+        })}
+      </Tabs>
+    </PageLayout>
   );
 }
