@@ -13,9 +13,3 @@ export const TIMEFRAME_LABELS: Record<(typeof TIMEFRAMES)[number], string> = {
 };
 
 export const APP_TITLE = "Bitcoin Quant Indicators";
-
-/**
- * Cache duration for external API responses (in milliseconds)
- * Helps reduce latency by avoiding repeated external API calls
- */
-export const API_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
