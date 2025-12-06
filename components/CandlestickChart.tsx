@@ -135,8 +135,10 @@ const CandlestickShape = (props: CandlestickShapeProps) => {
   const wickColor = isPositive ? "#26a69a" : "#ef5350";
   const bodyColor = isPositive ? "#26a69a" : "#ef5350";
 
+  // Calculate the center of the bar (x is the left edge, so center is x + width/2)
+  const barCenterX = x + width / 2;
   const candleWidth = Math.max(width * 0.6, 4);
-  const candleX = x - candleWidth / 2;
+  const candleX = barCenterX - candleWidth / 2;
   const bodyHeight = Math.abs(bodyBottomY - bodyTopY);
 
   // Calculate the full chart height for vertical lines
@@ -172,9 +174,9 @@ const CandlestickShape = (props: CandlestickShapeProps) => {
       {signalStroke && (
         <>
           <line
-            x1={x}
+            x1={barCenterX}
             y1={plotAreaTop}
-            x2={x}
+            x2={barCenterX}
             y2={xAxisY}
             stroke={signalStroke}
             strokeWidth={1}
@@ -183,7 +185,7 @@ const CandlestickShape = (props: CandlestickShapeProps) => {
           {/* Label at the top */}
           {signalLabel && (
             <text
-              x={x}
+              x={barCenterX}
               y={plotAreaTop - 8}
               fill={signalStroke}
               fontSize={11}
@@ -196,9 +198,9 @@ const CandlestickShape = (props: CandlestickShapeProps) => {
       )}
       {/* Wick (high-low line) */}
       <line
-        x1={x}
+        x1={barCenterX}
         y1={highY}
-        x2={x}
+        x2={barCenterX}
         y2={lowY}
         stroke={wickColor}
         strokeWidth={1.5}
@@ -376,7 +378,7 @@ export default function CandlestickChart({
               {...(props as CandlestickShapeProps)}
               yDomain={[priceMin * 0.95, priceMax * 1.05]}
               height={600}
-              margin={{ top: 40, right: 30, left: 60, bottom: 20 }}
+              margin={{ top: 20, right: 30, left: 60, bottom: 20 }}
             />
           )}
           name="BTC-USD"
