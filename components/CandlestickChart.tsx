@@ -9,6 +9,7 @@ import {
   createSeriesMarkers,
   IChartApi,
   ISeriesApi,
+  ISeriesMarkersPluginApi,
   LineData,
   LineSeries,
   Time,
@@ -56,8 +57,7 @@ export default function CandlestickChart({
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const markersRef = useRef<any>(null);
+  const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const ema13SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const ema21SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const ema50SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
@@ -128,8 +128,7 @@ export default function CandlestickChart({
     candlestickSeriesRef.current = candlestickSeries;
 
     // Create markers instance for the candlestick series
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    markersRef.current = createSeriesMarkers(candlestickSeries as any, []);
+    markersRef.current = createSeriesMarkers(candlestickSeries, []);
 
     // Notify parent component that series is ready
     if (onSeriesReady) {

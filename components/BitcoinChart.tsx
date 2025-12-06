@@ -72,6 +72,14 @@ function StochasticChart({
   const dSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const overboughtLineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const oversoldLineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const onChartReadyRef = useRef(onChartReady);
+  const onSeriesReadyRef = useRef(onSeriesReady);
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    onChartReadyRef.current = onChartReady;
+    onSeriesReadyRef.current = onSeriesReady;
+  }, [onChartReady, onSeriesReady]);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -167,11 +175,11 @@ function StochasticChart({
     kSeriesRef.current = kSeries;
 
     // Notify parent component that chart and series are ready
-    if (onChartReady) {
-      onChartReady(chart);
+    if (onChartReadyRef.current) {
+      onChartReadyRef.current(chart);
     }
-    if (onSeriesReady) {
-      onSeriesReady(kSeries);
+    if (onSeriesReadyRef.current) {
+      onSeriesReadyRef.current(kSeries);
     }
 
     // Create %D series
@@ -208,7 +216,6 @@ function StochasticChart({
         chartRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update chart data when data prop changes
