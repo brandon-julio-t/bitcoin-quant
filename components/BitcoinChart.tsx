@@ -175,7 +175,7 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
   return (
     <div className="space-y-4">
       {/* Main Price Chart */}
-      <div className="bg-card rounded-lg p-4 border">
+      <div className="bg-card rounded-lg p-4 border space-y-6">
         <h2 className="text-xl font-bold text-card-foreground mb-4 text-center">
           Bitcoin (BTC-USD)
         </h2>
@@ -184,13 +184,8 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
           priceMin={priceMin}
           priceMax={priceMax}
         />
-      </div>
 
-      {/* Stochastic Oscillator */}
-      <div className="bg-card rounded-lg p-4 border">
-        <h3 className="text-lg font-bold text-card-foreground mb-4 text-center">
-          Stochastic Oscillator
-        </h3>
+        {/* Stochastic Oscillator */}
         <ResponsiveContainer width="100%" height={200}>
           <ComposedChart
             data={chartData}
