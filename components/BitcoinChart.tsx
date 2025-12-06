@@ -228,7 +228,7 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
               type="monotone"
               dataKey="stochasticK"
               stroke="rgba(33, 150, 243, 1)"
-              strokeWidth={1.5}
+              strokeWidth={1}
               dot={false}
               name="%K"
               connectNulls
@@ -237,7 +237,7 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
               type="monotone"
               dataKey="stochasticD"
               stroke="rgba(255, 152, 0, 1)"
-              strokeWidth={1.5}
+              strokeWidth={1}
               dot={false}
               name="%D"
               connectNulls
