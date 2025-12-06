@@ -49,111 +49,108 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
     const dateRangeStart = new Date(dates[0]);
     const dateRangeEnd = new Date(dates[dates.length - 1]);
 
-    // Prepare data points with all indicators
-    return data.map((point, index) => ({
-      date: new Date(point.date).toISOString(),
-      dateLabel: format(new Date(point.date), "d MMM yyyy"),
-      open: point.open,
-      high: point.high,
-      low: point.low,
-      close: point.close,
-      volume: point.volume,
-      ema13: indicators.ema13[index] || null,
-      ema21: indicators.ema21[index] || null,
-      ema50: indicators.ema50[index] || null,
-      ema100: indicators.ema100[index] || null,
-      bbUpper: indicators.bollinger.upper[index] || null,
-      bbMiddle: indicators.bollinger.middle[index] || null,
-      bbLower: indicators.bollinger.lower[index] || null,
-      stochasticK: indicators.stochastic.k[index] || null,
-      stochasticD: indicators.stochastic.d[index] || null,
-    }));
-  }, [data, indicators]);
+    // Helper function to find the nearest candlestick date for a signal
+    const findNearestCandlestickDate = (targetDate: Date): Date | null => {
+      if (!data.length) return null;
 
-  const referenceLines = useMemo(() => {
-    if (!data.length || !chartData.length) return [];
-
-    const signals = getBitcoinHalvingSignals();
-    const dateRangeStart = new Date(data[0].date);
-    const dateRangeEnd = new Date(data[data.length - 1].date);
-    const lines: Array<{
-      x: string;
-      stroke: string;
-      strokeDasharray?: string;
-      label?: string;
-    }> = [];
-
-    // Helper function to find the exact matching dateLabel
-    // This ensures the reference line aligns perfectly with the candlestick center
-    const findNearestDateLabel = (targetDate: Date): string | null => {
-      if (!chartData.length) return null;
-
-      let nearestDataPoint = chartData[0];
+      let nearestDate = new Date(data[0].date);
       let minDiff = Math.abs(
-        new Date(chartData[0].date).getTime() - targetDate.getTime()
+        new Date(data[0].date).getTime() - targetDate.getTime()
       );
 
-      for (const point of chartData) {
+      for (const point of data) {
         const pointDate = new Date(point.date);
         const diff = Math.abs(pointDate.getTime() - targetDate.getTime());
         if (diff < minDiff) {
           minDiff = diff;
-          nearestDataPoint = point;
+          nearestDate = pointDate;
         }
       }
 
-      // Return the exact dateLabel string from the chart data
-      // This must match exactly for Recharts to center the line on the candlestick
-      return nearestDataPoint.dateLabel;
+      return nearestDate;
     };
 
-    // Halving dates
+    // Create sets of signal dates for quick lookup
+    const halvingDates = new Set<string>();
+    const topSignalDates = new Set<string>();
+    const bottomSignalDates = new Set<string>();
+    const halvingLabels = new Map<string, string>();
+    const topSignalLabels = new Map<string, string>();
+    const bottomSignalLabels = new Map<string, string>();
+
+    // Process halving dates
     signals.halvings.forEach((halvingDate, i) => {
       if (halvingDate >= dateRangeStart && halvingDate <= dateRangeEnd) {
-        const dateLabel = findNearestDateLabel(halvingDate);
-        if (dateLabel) {
-          lines.push({
-            x: dateLabel,
-            stroke: "rgba(255, 255, 0, 0.8)",
-            strokeDasharray: "5 5",
-            label: `Halving ${i + 1}`,
-          });
+        const nearestDate = findNearestCandlestickDate(halvingDate);
+        if (nearestDate) {
+          const dateKey = nearestDate.toISOString();
+          halvingDates.add(dateKey);
+          halvingLabels.set(dateKey, `Halving ${i + 1}`);
         }
       }
     });
 
-    // Top signals (17 months / ~518 days after halving)
+    // Process top signals
     signals.topSignals.forEach((topSignal, i) => {
       if (topSignal >= dateRangeStart && topSignal <= dateRangeEnd) {
-        const dateLabel = findNearestDateLabel(topSignal);
-        if (dateLabel) {
-          lines.push({
-            x: dateLabel,
-            stroke: "rgba(0, 255, 0, 0.8)",
-            strokeDasharray: "10 5",
-            label: `Top ${i + 1}`,
-          });
+        const nearestDate = findNearestCandlestickDate(topSignal);
+        if (nearestDate) {
+          const dateKey = nearestDate.toISOString();
+          topSignalDates.add(dateKey);
+          topSignalLabels.set(dateKey, `Top ${i + 1}`);
         }
       }
     });
 
-    // Bottom signals (29 months / ~883 days after halving)
+    // Process bottom signals
     signals.bottomSignals.forEach((bottomSignal, i) => {
       if (bottomSignal >= dateRangeStart && bottomSignal <= dateRangeEnd) {
-        const dateLabel = findNearestDateLabel(bottomSignal);
-        if (dateLabel) {
-          lines.push({
-            x: dateLabel,
-            stroke: "rgba(255, 0, 0, 0.8)",
-            strokeDasharray: "10 5",
-            label: `Bottom ${i + 1}`,
-          });
+        const nearestDate = findNearestCandlestickDate(bottomSignal);
+        if (nearestDate) {
+          const dateKey = nearestDate.toISOString();
+          bottomSignalDates.add(dateKey);
+          bottomSignalLabels.set(dateKey, `Bottom ${i + 1}`);
         }
       }
     });
 
-    return lines;
-  }, [data, chartData]);
+    // Prepare data points with all indicators and signal flags
+    return data.map((point, index) => {
+      const pointDate = new Date(point.date);
+      const dateKey = pointDate.toISOString();
+      const isHalving = halvingDates.has(dateKey);
+      const isTopSignal = topSignalDates.has(dateKey);
+      const isBottomSignal = bottomSignalDates.has(dateKey);
+
+      return {
+        date: dateKey,
+        dateLabel: format(pointDate, "d MMM yyyy"),
+        open: point.open,
+        high: point.high,
+        low: point.low,
+        close: point.close,
+        volume: point.volume,
+        ema13: indicators.ema13[index] || null,
+        ema21: indicators.ema21[index] || null,
+        ema50: indicators.ema50[index] || null,
+        ema100: indicators.ema100[index] || null,
+        bbUpper: indicators.bollinger.upper[index] || null,
+        bbMiddle: indicators.bollinger.middle[index] || null,
+        bbLower: indicators.bollinger.lower[index] || null,
+        stochasticK: indicators.stochastic.k[index] || null,
+        stochasticD: indicators.stochastic.d[index] || null,
+        // Signal flags
+        isHalving,
+        isTopSignal,
+        isBottomSignal,
+        halvingLabel: isHalving ? halvingLabels.get(dateKey) : undefined,
+        topSignalLabel: isTopSignal ? topSignalLabels.get(dateKey) : undefined,
+        bottomSignalLabel: isBottomSignal
+          ? bottomSignalLabels.get(dateKey)
+          : undefined,
+      };
+    });
+  }, [data, indicators]);
 
   if (!chartData.length) {
     return (
@@ -175,7 +172,6 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
         </h2>
         <CandlestickChart
           data={chartData}
-          referenceLines={referenceLines}
           priceMin={priceMin}
           priceMax={priceMax}
         />

@@ -9,7 +9,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ReferenceLine,
   Bar,
 } from "recharts";
 import { OHLCV } from "@/lib/indicators";
@@ -31,12 +30,13 @@ interface CandlestickChartProps {
     bbUpper: number | null;
     bbMiddle: number | null;
     bbLower: number | null;
-  }>;
-  referenceLines: Array<{
-    x: string;
-    stroke: string;
-    strokeDasharray?: string;
-    label?: string;
+    // Signal flags
+    isHalving?: boolean;
+    isTopSignal?: boolean;
+    isBottomSignal?: boolean;
+    halvingLabel?: string;
+    topSignalLabel?: string;
+    bottomSignalLabel?: string;
   }>;
   priceMin: number;
   priceMax: number;
@@ -45,7 +45,18 @@ interface CandlestickChartProps {
 // Custom candlestick shape for Bar component
 const CandlestickShape = (props: any) => {
   const { x, y, width, payload } = props;
-  const { open, high, low, close } = payload;
+  const {
+    open,
+    high,
+    low,
+    close,
+    isHalving,
+    isTopSignal,
+    isBottomSignal,
+    halvingLabel,
+    topSignalLabel,
+    bottomSignalLabel,
+  } = payload;
   const isPositive = close >= open;
 
   // Get the Y-axis scale and domain from props
@@ -100,8 +111,59 @@ const CandlestickShape = (props: any) => {
   const candleX = x - candleWidth / 2;
   const bodyHeight = Math.abs(bodyBottomY - bodyTopY);
 
+  // Calculate the full chart height for vertical lines
+  const plotAreaTop = margin.top;
+  const plotAreaBottom = chartHeight - margin.bottom;
+  const plotAreaHeight = plotAreaBottom - plotAreaTop;
+
+  // Determine signal line properties
+  let signalStroke: string | null = null;
+  let signalDashArray: string | undefined = undefined;
+  let signalLabel: string | undefined = undefined;
+
+  if (isHalving) {
+    signalStroke = "rgba(255, 255, 0, 0.8)";
+    signalDashArray = "5 5";
+    signalLabel = halvingLabel;
+  } else if (isTopSignal) {
+    signalStroke = "rgba(0, 255, 0, 0.8)";
+    signalDashArray = "10 5";
+    signalLabel = topSignalLabel;
+  } else if (isBottomSignal) {
+    signalStroke = "rgba(255, 0, 0, 0.8)";
+    signalDashArray = "10 5";
+    signalLabel = bottomSignalLabel;
+  }
+
   return (
     <g>
+      {/* Vertical reference line - drawn first so it's behind the candlestick */}
+      {signalStroke && (
+        <>
+          <line
+            x1={x}
+            y1={plotAreaTop}
+            x2={x}
+            y2={plotAreaBottom}
+            stroke={signalStroke}
+            strokeWidth={1.5}
+            strokeDasharray={signalDashArray}
+          />
+          {/* Label at the top */}
+          {signalLabel && (
+            <text
+              x={x}
+              y={plotAreaTop - 8}
+              fill={signalStroke}
+              fontSize={11}
+              textAnchor="middle"
+              dominantBaseline="hanging"
+            >
+              {signalLabel}
+            </text>
+          )}
+        </>
+      )}
       {/* Wick (high-low line) */}
       <line
         x1={x}
@@ -127,7 +189,6 @@ const CandlestickShape = (props: any) => {
 
 export default function CandlestickChart({
   data,
-  referenceLines,
   priceMin,
   priceMax,
 }: CandlestickChartProps) {
@@ -137,25 +198,6 @@ export default function CandlestickChart({
       ...d,
     }));
   }, [data]);
-
-  // Create a map of dateLabel to index for quick lookup
-  const dateLabelToIndex = useMemo(() => {
-    const map = new Map<string, number>();
-    candlestickData.forEach((d, index) => {
-      map.set(d.dateLabel, index);
-    });
-    return map;
-  }, [candlestickData]);
-
-  // Get reference line indices for custom rendering
-  const referenceLineIndices = useMemo(() => {
-    return referenceLines
-      .map((line) => {
-        const index = dateLabelToIndex.get(line.x);
-        return index !== undefined ? { ...line, index } : null;
-      })
-      .filter((line): line is typeof line & { index: number } => line !== null);
-  }, [referenceLines, dateLabelToIndex]);
 
   return (
     <ResponsiveContainer width="100%" height={600}>
@@ -308,7 +350,7 @@ export default function CandlestickChart({
               {...props}
               yDomain={[priceMin * 0.95, priceMax * 1.05]}
               height={600}
-              margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+              margin={{ top: 40, right: 30, left: 60, bottom: 20 }}
             />
           )}
           name="BTC-USD"
@@ -352,29 +394,6 @@ export default function CandlestickChart({
           name="EMA 100"
           connectNulls
         />
-
-        {/* Reference Lines for Halving Signals */}
-        {/* Using ReferenceLine with exact dateLabel - Recharts should center it on the category */}
-        {referenceLines.map((line, idx) => {
-          const dataIndex = dateLabelToIndex.get(line.x);
-          if (dataIndex === undefined || dataIndex < 0) return null;
-
-          return (
-            <ReferenceLine
-              key={`ref-${idx}`}
-              x={line.x}
-              stroke={line.stroke}
-              strokeDasharray={line.strokeDasharray}
-              ifOverflow="visible"
-              label={{
-                value: line.label,
-                position: "top",
-                fill: line.stroke,
-                fontSize: 11,
-              }}
-            />
-          );
-        })}
       </ComposedChart>
     </ResponsiveContainer>
   );
