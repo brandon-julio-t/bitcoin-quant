@@ -122,7 +122,7 @@ async function fetchBlockHash(blockHeight: number): Promise<string | null> {
 
     const hash = await response.text();
     console.log(
-      `[${new Date().toISOString()}] 🔗 Block ${blockHeight} hash: ${hash.substring(0, 16)}...`
+      `[${new Date().toISOString()}] 🔗 Block ${blockHeight} hash: ${hash}...`
     );
     return hash;
   } catch (error) {
@@ -139,7 +139,7 @@ async function fetchBlockHash(blockHeight: number): Promise<string | null> {
  */
 async function fetchBlockDetails(blockHash: string): Promise<BlockData> {
   console.log(
-    `[${new Date().toISOString()}] 📦 Fetching block details for hash ${blockHash.substring(0, 16)}...`
+    `[${new Date().toISOString()}] 📦 Fetching block details for hash ${blockHash}...`
   );
 
   const blockResponse = await fetch(
@@ -152,12 +152,12 @@ async function fetchBlockDetails(blockHash: string): Promise<BlockData> {
   );
 
   console.log(
-    `[${new Date().toISOString()}] 📡 Block details response status: ${blockResponse.status} for hash ${blockHash.substring(0, 16)}...`
+    `[${new Date().toISOString()}] 📡 Block details response status: ${blockResponse.status} for hash ${blockHash}...`
   );
 
   if (!blockResponse.ok) {
     console.error(
-      `[${new Date().toISOString()}] ❌ Failed to fetch block details for ${blockHash.substring(0, 16)}...: ${blockResponse.status} ${blockResponse.statusText}`
+      `[${new Date().toISOString()}] ❌ Failed to fetch block details for ${blockHash}...: ${blockResponse.status} ${blockResponse.statusText}`
     );
     throw new Error(
       `Failed to fetch block details: ${blockResponse.statusText}`
