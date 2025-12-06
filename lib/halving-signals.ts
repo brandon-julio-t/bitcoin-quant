@@ -9,17 +9,12 @@ export interface HalvingSignals {
 }
 
 /**
- * Get Bitcoin halving dates and calculate top/bottom signals
+ * Calculate top and bottom signals from halving dates
+ *
+ * @param halvingDates - Array of halving dates (from API)
+ * @returns HalvingSignals with halvings, topSignals, and bottomSignals
  */
-export function getBitcoinHalvingSignals(): HalvingSignals {
-  // Bitcoin halving dates
-  const halvingDates = [
-    new Date(2012, 10, 28), // November 28, 2012 (month is 0-indexed)
-    new Date(2016, 6, 9), // July 9, 2016
-    new Date(2020, 4, 11), // May 11, 2020
-    new Date(2024, 3, 20), // April 20, 2024
-  ];
-
+export function calculateHalvingSignals(halvingDates: Date[]): HalvingSignals {
   const topSignals: Date[] = [];
   const bottomSignals: Date[] = [];
 

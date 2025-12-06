@@ -8,8 +8,9 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
-import { getBitcoinHalvingSignals } from "@/lib/halving-signals";
+import { calculateHalvingSignals } from "@/lib/halving-signals";
 import { OHLCV } from "@/lib/indicators";
+import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   ColorType,
@@ -368,11 +369,33 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
   );
   const stochasticKSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
 
+  // Fetch halving dates from API
+  const {
+    data: halvingDatesData,
+    isLoading: isLoadingHalvingDates,
+    error: halvingDatesError,
+  } = useQuery<{ halvingDates: string[] }>({
+    queryKey: ["halving-dates"],
+    queryFn: async () => {
+      const response = await fetch("/api/halving-dates");
+      if (!response.ok) {
+        throw new Error("Failed to fetch halving dates");
+      }
+      return response.json();
+    },
+    staleTime: 1000 * 60 * 60 * 24, // 24 hours - halving dates don't change often
+  });
+
   const chartData = useMemo(() => {
     if (!data.length) return [];
+    if (!halvingDatesData?.halvingDates) return [];
 
     const dates = data.map((d) => d.date);
-    const signals = getBitcoinHalvingSignals();
+    // Convert string dates to Date objects and calculate signals
+    const halvingDatesArray = halvingDatesData.halvingDates.map(
+      (dateStr) => new Date(dateStr)
+    );
+    const signals = calculateHalvingSignals(halvingDatesArray);
     const dateRangeStart = new Date(dates[0]);
     const dateRangeEnd = new Date(dates[dates.length - 1]);
 
@@ -398,7 +421,7 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
     };
 
     // Create sets of signal dates for quick lookup
-    const halvingDates = new Set<string>();
+    const halvingDateKeys = new Set<string>();
     const topSignalDates = new Set<string>();
     const bottomSignalDates = new Set<string>();
     const halvingLabels = new Map<string, string>();
@@ -411,7 +434,7 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
         const nearestDate = findNearestCandlestickDate(halvingDate);
         if (nearestDate) {
           const dateKey = nearestDate.toISOString();
-          halvingDates.add(dateKey);
+          halvingDateKeys.add(dateKey);
           halvingLabels.set(dateKey, `Halving ${i + 1}`);
         }
       }
@@ -445,7 +468,7 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
     return data.map((point, index) => {
       const pointDate = new Date(point.date);
       const dateKey = pointDate.toISOString();
-      const isHalving = halvingDates.has(dateKey);
+      const isHalving = halvingDateKeys.has(dateKey);
       const isTopSignal = topSignalDates.has(dateKey);
       const isBottomSignal = bottomSignalDates.has(dateKey);
 
@@ -477,7 +500,7 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
           : undefined,
       };
     });
-  }, [data, indicators]);
+  }, [data, indicators, halvingDatesData]);
 
   // Synchronize crosshair between BTC and Stochastic charts
   useEffect(() => {
@@ -586,7 +609,7 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
     };
   }, []);
 
-  if (!chartData.length) {
+  if (isLoadingHalvingDates || !chartData.length) {
     return (
       <Empty className="border">
         <EmptyHeader>
@@ -594,7 +617,24 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
             <Spinner />
           </EmptyMedia>
           <EmptyTitle>Loading chart</EmptyTitle>
-          <EmptyDescription>Preparing chart data...</EmptyDescription>
+          <EmptyDescription>
+            {isLoadingHalvingDates
+              ? "Fetching halving dates..."
+              : "Preparing chart data..."}
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
+  if (halvingDatesError) {
+    return (
+      <Empty className="border">
+        <EmptyHeader>
+          <EmptyTitle>Error loading halving dates</EmptyTitle>
+          <EmptyDescription>
+            Failed to fetch Bitcoin halving dates. Please try again later.
+          </EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
