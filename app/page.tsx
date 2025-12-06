@@ -1,7 +1,6 @@
 "use client";
 
 import BitcoinChart from "@/components/BitcoinChart";
-import ChartControls from "@/components/ChartControls";
 import {
   Empty,
   EmptyDescription,
@@ -9,11 +8,13 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { calculateAllIndicators, OHLCV } from "@/lib/indicators";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 /**
  * Bitcoin genesis block date: January 3, 2009
@@ -44,9 +45,13 @@ async function fetchBitcoinData(timeframe: string): Promise<OHLCV[]> {
 
 const TIMEFRAMES = ["1d", "1w", "1m"] as const;
 
-export default function Home() {
-  const [timeframe, setTimeframe] = useState<(typeof TIMEFRAMES)[number]>("1m");
+const TIMEFRAME_LABELS: Record<(typeof TIMEFRAMES)[number], string> = {
+  "1d": "1 Day",
+  "1w": "1 Week",
+  "1m": "1 Month",
+};
 
+export default function Home() {
   // Load all timeframes in parallel for instant switching
   const timeframeQueries = useQueries({
     queries: TIMEFRAMES.map((tf) => ({
@@ -73,33 +78,17 @@ export default function Home() {
     staleTime: 1000 * 60 * 60 * 24, // 24 hours - halving dates don't change often
   });
 
-  // Create a map of timeframe to query result for easy access
-  const timeframeDataMap = useMemo(() => {
-    const map = new Map<
-      string,
-      { data?: OHLCV[]; isLoading: boolean; error: Error | null }
-    >();
+  // Calculate indicators for each timeframe
+  const indicatorsMap = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof calculateAllIndicators>>();
     TIMEFRAMES.forEach((tf, index) => {
       const query = timeframeQueries[index];
-      map.set(tf, {
-        data: query.data,
-        isLoading: query.isLoading,
-        error: query.error as Error | null,
-      });
+      if (query.data) {
+        map.set(tf, calculateAllIndicators(query.data));
+      }
     });
     return map;
   }, [timeframeQueries]);
-
-  // Get the current timeframe's data
-  const currentTimeframeData = timeframeDataMap.get(timeframe);
-  const bitcoinData = currentTimeframeData?.data;
-  const isLoading = currentTimeframeData?.isLoading ?? false;
-  const error = currentTimeframeData?.error ?? null;
-
-  const indicators = useMemo(() => {
-    if (!bitcoinData) return null;
-    return calculateAllIndicators(bitcoinData);
-  }, [bitcoinData]);
 
   return (
     <main className="min-h-screen bg-background text-foreground p-4 md:p-8">
@@ -108,56 +97,73 @@ export default function Home() {
           Bitcoin Quant Indicators
         </h1>
 
-        <ChartControls
-          timeframe={timeframe}
-          onTimeframeChange={(tf) => {
-            const validTimeframe = TIMEFRAMES.find((t) => t === tf);
-            if (validTimeframe) {
-              setTimeframe(validTimeframe);
-            }
-          }}
-          loadingStates={Object.fromEntries(
-            TIMEFRAMES.map((tf, index) => [
-              tf,
-              timeframeQueries[index].isLoading,
-            ])
-          )}
-        />
+        <Tabs defaultValue="1m" className="w-full">
+          <Field>
+            <FieldLabel>Timeframe</FieldLabel>
+            <TabsList>
+              {TIMEFRAMES.map((tf, index) => {
+                const isLoading = timeframeQueries[index].isLoading;
+                return (
+                  <TabsTrigger key={tf} value={tf} className="relative">
+                    {isLoading && (
+                      <Spinner className="size-3 mr-1.5" aria-label="Loading" />
+                    )}
+                    {TIMEFRAME_LABELS[tf]}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </Field>
 
-        {isLoading && (
-          <Empty className="border">
-            <EmptyHeader>
-              <EmptyMedia>
-                <Spinner />
-              </EmptyMedia>
-              <EmptyTitle>Loading chart data</EmptyTitle>
-              <EmptyDescription>
-                Please wait while we fetch the latest Bitcoin data...
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        )}
+          {TIMEFRAMES.map((tf, index) => {
+            const query = timeframeQueries[index];
+            const bitcoinData = query.data;
+            const isLoading = query.isLoading;
+            const error = query.error as Error | null;
+            const indicators = indicatorsMap.get(tf);
 
-        {error && (
-          <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-md mb-4">
-            <strong>Error:</strong>{" "}
-            {error instanceof Error ? error.message : "An error occurred"}
-          </div>
-        )}
+            return (
+              <TabsContent key={tf} value={tf}>
+                {isLoading && (
+                  <Empty className="border">
+                    <EmptyHeader>
+                      <EmptyMedia>
+                        <Spinner />
+                      </EmptyMedia>
+                      <EmptyTitle>Loading chart data</EmptyTitle>
+                      <EmptyDescription>
+                        Please wait while we fetch the latest Bitcoin data...
+                      </EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                )}
 
-        {!isLoading &&
-          !error &&
-          bitcoinData &&
-          bitcoinData.length > 0 &&
-          indicators && (
-            <BitcoinChart
-              data={bitcoinData}
-              indicators={indicators}
-              halvingDates={halvingDatesData?.halvingDates}
-              isLoadingHalvingDates={isLoadingHalvingDates}
-              halvingDatesError={halvingDatesError}
-            />
-          )}
+                {error && (
+                  <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-md mb-4">
+                    <strong>Error:</strong>{" "}
+                    {error instanceof Error
+                      ? error.message
+                      : "An error occurred"}
+                  </div>
+                )}
+
+                {!isLoading &&
+                  !error &&
+                  bitcoinData &&
+                  bitcoinData.length > 0 &&
+                  indicators && (
+                    <BitcoinChart
+                      data={bitcoinData}
+                      indicators={indicators}
+                      halvingDates={halvingDatesData?.halvingDates}
+                      isLoadingHalvingDates={isLoadingHalvingDates}
+                      halvingDatesError={halvingDatesError}
+                    />
+                  )}
+              </TabsContent>
+            );
+          })}
+        </Tabs>
       </div>
     </main>
   );

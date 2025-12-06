@@ -256,7 +256,7 @@ export default function CandlestickChart({
         chartRef.current = null;
       }
     };
-  }, [onChartReady, onSeriesReady]);
+  }, [onChartReady, onSeriesReady, isLogarithmic]);
 
   // Update chart data when data prop changes
   useEffect(() => {
