@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import {
   CandlestickData,
   CandlestickSeries,
@@ -11,7 +12,8 @@ import {
   LineSeries,
   Time,
 } from "lightweight-charts";
-import { useEffect, useRef } from "react";
+import { LogsIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 interface CandlestickChartProps {
   data: Array<{
@@ -60,6 +62,7 @@ export default function CandlestickChart({
   const bbUpperSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const bbMiddleSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const bbLowerSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const [isLogarithmic, setIsLogarithmic] = useState(false);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -82,6 +85,7 @@ export default function CandlestickChart({
           top: 0.1,
           bottom: 0.1,
         },
+        mode: 0, // Start with linear scale, will be updated by useEffect
       },
       timeScale: {
         borderColor: "#ffffff",
@@ -94,6 +98,11 @@ export default function CandlestickChart({
     });
 
     chartRef.current = chart;
+
+    // Set initial scale mode
+    chart.priceScale("right").applyOptions({
+      mode: isLogarithmic ? 1 : 0, // 0 = Normal (linear), 1 = Logarithmic
+    });
 
     // Notify parent component that chart is ready
     if (onChartReady) {
@@ -256,6 +265,9 @@ export default function CandlestickChart({
     const bbMiddleData: LineData<Time>[] = [];
     const bbLowerData: LineData<Time>[] = [];
 
+    // Minimum value for logarithmic scale to avoid log(0) or log(negative) issues
+    const MIN_LOG_VALUE = 0.01;
+
     data.forEach((point) => {
       // Convert date string to timestamp (seconds)
       const timestamp = Math.floor(
@@ -282,14 +294,30 @@ export default function CandlestickChart({
       if (point.ema100 !== null) {
         ema100Data.push({ time: timestamp, value: point.ema100 });
       }
-      if (point.bbUpper !== null) {
-        bbUpperData.push({ time: timestamp, value: point.bbUpper });
-      }
-      if (point.bbMiddle !== null) {
-        bbMiddleData.push({ time: timestamp, value: point.bbMiddle });
-      }
-      if (point.bbLower !== null) {
-        bbLowerData.push({ time: timestamp, value: point.bbLower });
+
+      // For Bollinger Bands: in logarithmic mode, filter out values <= 0
+      // to prevent breaking the logarithmic scale rendering
+      if (isLogarithmic) {
+        if (point.bbUpper !== null && point.bbUpper > MIN_LOG_VALUE) {
+          bbUpperData.push({ time: timestamp, value: point.bbUpper });
+        }
+        if (point.bbMiddle !== null && point.bbMiddle > MIN_LOG_VALUE) {
+          bbMiddleData.push({ time: timestamp, value: point.bbMiddle });
+        }
+        if (point.bbLower !== null && point.bbLower > MIN_LOG_VALUE) {
+          bbLowerData.push({ time: timestamp, value: point.bbLower });
+        }
+      } else {
+        // In linear mode, include all valid Bollinger Band values
+        if (point.bbUpper !== null) {
+          bbUpperData.push({ time: timestamp, value: point.bbUpper });
+        }
+        if (point.bbMiddle !== null) {
+          bbMiddleData.push({ time: timestamp, value: point.bbMiddle });
+        }
+        if (point.bbLower !== null) {
+          bbLowerData.push({ time: timestamp, value: point.bbLower });
+        }
       }
     });
 
@@ -305,13 +333,47 @@ export default function CandlestickChart({
 
     // Fit content
     chartRef.current.timeScale().fitContent();
-  }, [data]);
+  }, [data, isLogarithmic]);
+
+  // Apply logarithmic scale mode when state changes
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    chartRef.current.priceScale("right").applyOptions({
+      mode: isLogarithmic ? 1 : 0, // 0 = Normal (linear), 1 = Logarithmic
+    });
+  }, [isLogarithmic]);
+
+  /**
+   * Toggles between linear and logarithmic price scale modes
+   */
+  const toggleLogarithmicMode = () => {
+    setIsLogarithmic((prev) => !prev);
+  };
 
   return (
-    <div
-      ref={chartContainerRef}
-      className="w-full"
-      style={{ height: "600px" }}
-    />
+    <div className="w-full space-y-2">
+      <div className="flex justify-end">
+        <Button
+          variant={isLogarithmic ? "default" : "outline"}
+          size="sm"
+          onClick={toggleLogarithmicMode}
+          className="gap-2"
+          aria-label={
+            isLogarithmic
+              ? "Switch to linear scale"
+              : "Switch to logarithmic scale"
+          }
+        >
+          <LogsIcon className="size-4" />
+          <span>{isLogarithmic ? "Log" : "Linear"}</span>
+        </Button>
+      </div>
+      <div
+        ref={chartContainerRef}
+        className="w-full"
+        style={{ height: "600px" }}
+      />
+    </div>
   );
 }
