@@ -76,7 +76,7 @@ export default function Home() {
     <main className="min-h-screen bg-background text-foreground p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl md:text-4xl font-bold text-center mb-8">
-          Bitcoin Trading Chart
+          Bitcoin Quant Indicators
         </h1>
 
         <ChartControls
