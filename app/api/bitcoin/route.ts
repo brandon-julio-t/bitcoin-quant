@@ -43,23 +43,6 @@ export async function GET(request: NextRequest) {
 
     const yfInterval = intervalMap[interval] || interval;
 
-    // Calculate period if dates not provided
-    let period = "10y"; // default
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const daysDiff = Math.ceil(
-        (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      if (daysDiff <= 5) period = "5d";
-      else if (daysDiff <= 60) period = "1mo";
-      else if (daysDiff <= 365) period = "1y";
-      else if (daysDiff <= 730) period = "2y";
-      else if (daysDiff <= 1825) period = "5y";
-      else period = "10y";
-    }
-
     // Build Yahoo Finance API URL
     const now = Math.floor(Date.now() / 1000);
     const startTimestamp = startDate

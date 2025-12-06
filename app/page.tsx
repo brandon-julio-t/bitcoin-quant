@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { format, subYears } from "date-fns";
 import BitcoinChart from "@/components/BitcoinChart";
 import ChartControls from "@/components/ChartControls";
-import { OHLCV } from "@/lib/indicators";
-import { calculateAllIndicators } from "@/lib/indicators";
+import { calculateAllIndicators, OHLCV } from "@/lib/indicators";
+import { format, subYears } from "date-fns";
+import { useCallback, useEffect, useState } from "react";
 
 export default function Home() {
   const [timeframe, setTimeframe] = useState("1m");
@@ -15,11 +14,25 @@ export default function Home() {
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [activePreset, setActivePreset] = useState("10y");
   const [data, setData] = useState<OHLCV[]>([]);
-  const [indicators, setIndicators] = useState<any>(null);
+  const [indicators, setIndicators] = useState<{
+    ema13: number[];
+    ema21: number[];
+    ema50: number[];
+    ema100: number[];
+    bollinger: {
+      upper: number[];
+      middle: number[];
+      lower: number[];
+    };
+    stochastic: {
+      k: number[];
+      d: number[];
+    };
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -49,11 +62,11 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeframe, startDate, endDate]);
 
   useEffect(() => {
     fetchData();
-  }, []); // Initial load
+  }, [fetchData]);
 
   const handleUpdate = () => {
     fetchData();

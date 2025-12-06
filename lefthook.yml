@@ -1,0 +1,21 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: lint
+      run: bun run lint --fix
+      stage_fixed: true
+    - name: format
+      run: bun run format
+      stage_fixed: true
+
+pre-push:
+  parallel: true
+  jobs:
+    - name: format
+      run: bun run format
+      stage_fixed: true
+    - name: lint
+      run: bun run lint --fix
+      stage_fixed: true
+    - name: check-types
+      run: bun run check-types

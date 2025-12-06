@@ -1,18 +1,17 @@
 "use client";
 
+import { useMemo } from "react";
 import {
+  Bar,
+  CartesianGrid,
   ComposedChart,
+  Legend,
   Line,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Bar,
 } from "recharts";
-import { OHLCV } from "@/lib/indicators";
-import { useMemo } from "react";
 
 interface CandlestickChartProps {
   data: Array<{
@@ -42,8 +41,37 @@ interface CandlestickChartProps {
   priceMax: number;
 }
 
+interface CandlestickShapeProps {
+  x: number;
+  y: number;
+  width: number;
+  payload: {
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    isHalving?: boolean;
+    isTopSignal?: boolean;
+    isBottomSignal?: boolean;
+    halvingLabel?: string;
+    topSignalLabel?: string;
+    bottomSignalLabel?: string;
+  };
+  yAxis?: {
+    scale: (value: number) => number;
+  };
+  yDomain?: [number, number];
+  height?: number;
+  margin?: {
+    top: number;
+    right: number;
+    left: number;
+    bottom: number;
+  };
+}
+
 // Custom candlestick shape for Bar component
-const CandlestickShape = (props: any) => {
+const CandlestickShape = (props: CandlestickShapeProps) => {
   const { x, y, width, payload } = props;
   const {
     open,
@@ -60,10 +88,10 @@ const CandlestickShape = (props: any) => {
   const isPositive = close >= open;
 
   // Get the Y-axis scale and domain from props
-  const yAxis = (props as any).yAxis;
-  const yDomain = (props as any).yDomain || [0, 100];
-  const chartHeight = (props as any).height || 600;
-  const margin = (props as any).margin || { top: 20, bottom: 20 };
+  const yAxis = props.yAxis;
+  const yDomain = props.yDomain || [0, 100];
+  const chartHeight = props.height || 600;
+  const margin = props.margin || { top: 20, right: 30, left: 60, bottom: 20 };
 
   // Calculate positions
   let highY: number, lowY: number, bodyTopY: number, bodyBottomY: number;
@@ -114,7 +142,6 @@ const CandlestickShape = (props: any) => {
   // Calculate the full chart height for vertical lines
   const plotAreaTop = margin.top;
   const plotAreaBottom = chartHeight - margin.bottom;
-  const plotAreaHeight = plotAreaBottom - plotAreaTop;
 
   // Determine signal line properties
   let signalStroke: string | null = null;
@@ -239,7 +266,7 @@ export default function CandlestickChart({
             color: "#ffffff",
           }}
           labelStyle={{ color: "#9ca3af" }}
-          formatter={(value: any, name: string) => {
+          formatter={(value: number | string, name: string) => {
             if (
               name === "candleHigh" ||
               name === "candleLow" ||
@@ -256,9 +283,11 @@ export default function CandlestickChart({
                 ]
               : [value, name];
           }}
-          content={(props: any) => {
-            if (!props.active || !props.payload) return null;
-            const data = props.payload[0]?.payload;
+          content={(props) => {
+            if (!props?.active || !props.payload) return null;
+            const data = props.payload[0]?.payload as
+              | (typeof candlestickData)[0]
+              | undefined;
             if (!data) return null;
             return (
               <div
@@ -345,9 +374,9 @@ export default function CandlestickChart({
         {/* Candlesticks */}
         <Bar
           dataKey="high"
-          shape={(props: any) => (
+          shape={(props: unknown) => (
             <CandlestickShape
-              {...props}
+              {...(props as CandlestickShapeProps)}
               yDomain={[priceMin * 0.95, priceMax * 1.05]}
               height={600}
               margin={{ top: 40, right: 30, left: 60, bottom: 20 }}

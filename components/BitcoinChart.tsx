@@ -1,24 +1,19 @@
 "use client";
 
+import { getBitcoinHalvingSignals } from "@/lib/halving-signals";
+import { OHLCV } from "@/lib/indicators";
+import { format } from "date-fns";
+import { useMemo } from "react";
 import {
+  CartesianGrid,
   ComposedChart,
   Line,
-  Area,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  ReferenceLine,
 } from "recharts";
-import { OHLCV } from "@/lib/indicators";
-import {
-  getBitcoinHalvingSignals,
-  findNearestCandlestick,
-} from "@/lib/halving-signals";
-import { useMemo } from "react";
-import { format } from "date-fns";
 import CandlestickChart from "./CandlestickChart";
 
 interface BitcoinChartProps {
@@ -220,7 +215,7 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
                 color: "#ffffff",
               }}
               labelStyle={{ color: "#9ca3af" }}
-              formatter={(value: any) => {
+              formatter={(value: number | string) => {
                 return typeof value === "number"
                   ? value.toLocaleString(undefined, {
                       minimumFractionDigits: 2,

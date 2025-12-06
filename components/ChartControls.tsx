@@ -1,8 +1,12 @@
 "use client";
 
-import { format, subDays, subMonths, subYears, startOfYear } from "date-fns";
-import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -10,13 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { format, startOfYear, subDays, subMonths, subYears } from "date-fns";
+import { CalendarIcon } from "lucide-react";
 
 interface ChartControlsProps {
   timeframe: string;
@@ -57,7 +57,7 @@ export default function ChartControls({
   const handlePresetClick = (presetId: string) => {
     const today = new Date();
     let newStartDate = startDate;
-    let newEndDate = format(today, "yyyy-MM-dd");
+    const newEndDate = format(today, "yyyy-MM-dd");
 
     switch (presetId) {
       case "1d":
