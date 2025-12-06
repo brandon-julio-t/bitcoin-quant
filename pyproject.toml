@@ -5,8 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "pandas>=2.3.3",
-    "plotly>=6.5.0",
-    "ta>=0.11.0",
-    "yfinance>=0.2.66",
+    "yfinance>=0.2.0",
+    "pandas>=2.0.0",
+    "plotly>=5.18.0",
+    "numpy>=1.24.0",
+    "dash>=2.14.0",
+    "dash-bootstrap-components>=1.5.0",
 ]
