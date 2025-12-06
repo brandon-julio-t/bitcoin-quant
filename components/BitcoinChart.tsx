@@ -479,9 +479,6 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
     });
   }, [data, indicators]);
 
-  const priceMin = Math.min(...data.map((d) => d.low));
-  const priceMax = Math.max(...data.map((d) => d.high));
-
   // Synchronize crosshair between BTC and Stochastic charts
   useEffect(() => {
     if (
@@ -612,8 +609,6 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
         </h2>
         <CandlestickChart
           data={chartData}
-          priceMin={priceMin}
-          priceMax={priceMax}
           onChartReady={(chart) => {
             btcChartRef.current = chart;
           }}

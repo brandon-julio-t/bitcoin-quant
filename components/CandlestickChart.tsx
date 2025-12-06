@@ -37,8 +37,6 @@ interface CandlestickChartProps {
     topSignalLabel?: string;
     bottomSignalLabel?: string;
   }>;
-  priceMin: number;
-  priceMax: number;
   onChartReady?: (chart: IChartApi) => void;
   onSeriesReady?: (series: ISeriesApi<"Candlestick">) => void;
 }
@@ -49,8 +47,6 @@ interface CandlestickChartProps {
  */
 export default function CandlestickChart({
   data,
-  priceMin,
-  priceMax,
   onChartReady,
   onSeriesReady,
 }: CandlestickChartProps) {
@@ -244,7 +240,7 @@ export default function CandlestickChart({
         chartRef.current = null;
       }
     };
-  }, []);
+  }, [onChartReady, onSeriesReady]);
 
   // Update chart data when data prop changes
   useEffect(() => {
