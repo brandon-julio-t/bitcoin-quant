@@ -2,9 +2,42 @@
 
 import BitcoinChart from "@/components/BitcoinChart";
 import ChartControls from "@/components/ChartControls";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Spinner } from "@/components/ui/spinner";
 import { calculateAllIndicators, OHLCV } from "@/lib/indicators";
+import { useQuery } from "@tanstack/react-query";
 import { format, subYears } from "date-fns";
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+
+async function fetchBitcoinData(
+  timeframe: string,
+  startDate: string,
+  endDate: string
+): Promise<OHLCV[]> {
+  const params = new URLSearchParams({
+    interval: timeframe,
+    startDate,
+    endDate,
+  });
+
+  const response = await fetch(`/api/bitcoin?${params}`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch Bitcoin data");
+  }
+
+  const bitcoinData: OHLCV[] = await response.json();
+  if (bitcoinData.length === 0) {
+    throw new Error("No data available for the selected date range");
+  }
+
+  return bitcoinData;
+}
 
 export default function Home() {
   const [timeframe, setTimeframe] = useState("1m");
@@ -13,63 +46,25 @@ export default function Home() {
   );
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [activePreset, setActivePreset] = useState("10y");
-  const [data, setData] = useState<OHLCV[]>([]);
-  const [indicators, setIndicators] = useState<{
-    ema13: number[];
-    ema21: number[];
-    ema50: number[];
-    ema100: number[];
-    bollinger: {
-      upper: number[];
-      middle: number[];
-      lower: number[];
-    };
-    stochastic: {
-      k: number[];
-      d: number[];
-    };
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const {
+    data: bitcoinData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["bitcoin", timeframe, startDate, endDate],
+    queryFn: () => fetchBitcoinData(timeframe, startDate, endDate),
+    staleTime: 1000 * 60 * 5, // 5 minutes - data stays fresh for 5 minutes
+  });
 
-    try {
-      const params = new URLSearchParams({
-        interval: timeframe,
-        startDate,
-        endDate,
-      });
-
-      const response = await fetch(`/api/bitcoin?${params}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch Bitcoin data");
-      }
-
-      const bitcoinData: OHLCV[] = await response.json();
-      if (bitcoinData.length === 0) {
-        throw new Error("No data available for the selected date range");
-      }
-
-      setData(bitcoinData);
-      const calculatedIndicators = calculateAllIndicators(bitcoinData);
-      setIndicators(calculatedIndicators);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-      console.error("Error fetching data:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [timeframe, startDate, endDate]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const indicators = useMemo(() => {
+    if (!bitcoinData) return null;
+    return calculateAllIndicators(bitcoinData);
+  }, [bitcoinData]);
 
   const handleUpdate = () => {
-    fetchData();
+    refetch();
   };
 
   return (
@@ -91,21 +86,34 @@ export default function Home() {
           onUpdate={handleUpdate}
         />
 
-        {loading && (
-          <div className="flex items-center justify-center h-[800px]">
-            <div className="text-xl text-foreground">Loading chart data...</div>
-          </div>
+        {isLoading && (
+          <Empty className="border">
+            <EmptyHeader>
+              <EmptyMedia>
+                <Spinner />
+              </EmptyMedia>
+              <EmptyTitle>Loading chart data</EmptyTitle>
+              <EmptyDescription>
+                Please wait while we fetch the latest Bitcoin data...
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
 
         {error && (
           <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-md mb-4">
-            <strong>Error:</strong> {error}
+            <strong>Error:</strong>{" "}
+            {error instanceof Error ? error.message : "An error occurred"}
           </div>
         )}
 
-        {!loading && !error && data.length > 0 && indicators && (
-          <BitcoinChart data={data} indicators={indicators} />
-        )}
+        {!isLoading &&
+          !error &&
+          bitcoinData &&
+          bitcoinData.length > 0 &&
+          indicators && (
+            <BitcoinChart data={bitcoinData} indicators={indicators} />
+          )}
       </div>
     </main>
   );

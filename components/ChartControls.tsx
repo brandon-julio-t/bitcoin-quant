@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import {
   Popover,
   PopoverContent,
@@ -103,13 +104,11 @@ export default function ChartControls({
   return (
     <div className="space-y-4 mb-6">
       {/* Timeframe and Date Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">
-            Timeframe
-          </label>
+      <FieldGroup className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Field>
+          <FieldLabel htmlFor="timeframe-select">Timeframe</FieldLabel>
           <Select value={timeframe} onValueChange={onTimeframeChange}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger id="timeframe-select" className="w-full">
               <SelectValue placeholder="Select timeframe" />
             </SelectTrigger>
             <SelectContent>
@@ -119,15 +118,14 @@ export default function ChartControls({
               <SelectItem value="1m">1 Month</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </Field>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">
-            Start Date
-          </label>
+        <Field>
+          <FieldLabel htmlFor="start-date-picker">Start Date</FieldLabel>
           <Popover>
             <PopoverTrigger asChild>
               <Button
+                id="start-date-picker"
                 variant="outline"
                 className={cn(
                   "w-full justify-start text-left font-normal",
@@ -155,15 +153,14 @@ export default function ChartControls({
               />
             </PopoverContent>
           </Popover>
-        </div>
+        </Field>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">
-            End Date
-          </label>
+        <Field>
+          <FieldLabel htmlFor="end-date-picker">End Date</FieldLabel>
           <Popover>
             <PopoverTrigger asChild>
               <Button
+                id="end-date-picker"
                 variant="outline"
                 className={cn(
                   "w-full justify-start text-left font-normal",
@@ -191,21 +188,22 @@ export default function ChartControls({
               />
             </PopoverContent>
           </Popover>
-        </div>
+        </Field>
 
-        <div className="flex items-end">
-          <Button onClick={onUpdate} className="w-full">
+        <Field>
+          <FieldLabel htmlFor="update-button" className="sr-only">
+            Update Chart
+          </FieldLabel>
+          <Button id="update-button" onClick={onUpdate} className="w-full">
             Update Chart
           </Button>
-        </div>
-      </div>
+        </Field>
+      </FieldGroup>
 
       {/* Quick Date Range Presets */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">
-          Quick Date Range
-        </label>
-        <div className="flex flex-wrap gap-2">
+      <Field>
+        <FieldLabel htmlFor="quick-date-range">Quick Date Range</FieldLabel>
+        <div id="quick-date-range" className="flex flex-wrap gap-2">
           {presets.map((preset) => (
             <Button
               key={preset.id}
@@ -217,7 +215,7 @@ export default function ChartControls({
             </Button>
           ))}
         </div>
-      </div>
+      </Field>
     </div>
   );
 }

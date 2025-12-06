@@ -1,5 +1,13 @@
 "use client";
 
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Spinner } from "@/components/ui/spinner";
 import { getBitcoinHalvingSignals } from "@/lib/halving-signals";
 import { OHLCV } from "@/lib/indicators";
 import { format } from "date-fns";
@@ -149,9 +157,15 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
 
   if (!chartData.length) {
     return (
-      <div className="flex items-center justify-center h-[800px] bg-background text-foreground">
-        <div>Loading chart...</div>
-      </div>
+      <Empty className="border">
+        <EmptyHeader>
+          <EmptyMedia>
+            <Spinner />
+          </EmptyMedia>
+          <EmptyTitle>Loading chart</EmptyTitle>
+          <EmptyDescription>Preparing chart data...</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   }
 
