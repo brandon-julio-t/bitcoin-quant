@@ -153,11 +153,11 @@ const CandlestickShape = (props: CandlestickShapeProps) => {
     signalDashArray = "5 5";
     signalLabel = halvingLabel;
   } else if (isTopSignal) {
-    signalStroke = "rgba(0, 255, 0, 0.8)";
+    signalStroke = "rgba(255, 0, 0, 0.8)";
     signalDashArray = "10 5";
     signalLabel = topSignalLabel;
   } else if (isBottomSignal) {
-    signalStroke = "rgba(255, 0, 0, 0.8)";
+    signalStroke = "rgba(0, 255, 0, 0.8)";
     signalDashArray = "10 5";
     signalLabel = bottomSignalLabel;
   }
