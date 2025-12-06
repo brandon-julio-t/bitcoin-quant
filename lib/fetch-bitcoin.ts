@@ -83,7 +83,7 @@ export async function fetchBitcoinDataDirect(
 
   const data: YahooFinanceResponse = await response.json();
   console.log(
-    `[${new Date().toISOString()}] 📦 Received ${JSON.stringify(data).length} bytes from Yahoo Finance`
+    `[${new Date().toISOString()}] 📦 Received data from Yahoo Finance`
   );
 
   if (!data.chart?.result?.[0]) {

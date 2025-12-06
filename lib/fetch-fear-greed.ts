@@ -51,7 +51,7 @@ export async function fetchFearGreedDataDirect(): Promise<
 
   const data: FearGreedAPIResponse = await response.json();
   console.log(
-    `[${new Date().toISOString()}] 📦 Received ${JSON.stringify(data).length} bytes from Alternative.me`
+    `[${new Date().toISOString()}] 📦 Received data from Alternative.me`
   );
 
   if (data.metadata.error) {
