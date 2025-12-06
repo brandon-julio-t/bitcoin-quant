@@ -140,8 +140,12 @@ const CandlestickShape = (props: CandlestickShapeProps) => {
   const bodyHeight = Math.abs(bodyBottomY - bodyTopY);
 
   // Calculate the full chart height for vertical lines
+  // Stop at the x-axis, which is at the bottom of the plot area
   const plotAreaTop = margin.top;
   const plotAreaBottom = chartHeight - margin.bottom;
+  // The x-axis has a height of 80px (from XAxis height prop)
+  // Stop the line just above the x-axis line (add small buffer for the axis line itself)
+  const xAxisY = plotAreaBottom - 80 + 5;
 
   // Determine signal line properties
   let signalStroke: string | null = null;
@@ -171,7 +175,7 @@ const CandlestickShape = (props: CandlestickShapeProps) => {
             x1={x}
             y1={plotAreaTop}
             x2={x}
-            y2={plotAreaBottom}
+            y2={xAxisY}
             stroke={signalStroke}
             strokeWidth={1}
             strokeDasharray={signalDashArray}
