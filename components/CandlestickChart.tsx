@@ -55,14 +55,7 @@ interface CandlestickChartProps {
  */
 
 // Centralized pane height configuration
-export const PANE_HEIGHTS = {
-  main: 500, // Main price chart pane
-  stochastic: 150, // Stochastic oscillator pane
-  fearGreed: 150, // Fear and Greed Index pane
-} as const;
-
-export const TOTAL_CHART_HEIGHT =
-  PANE_HEIGHTS.main + PANE_HEIGHTS.stochastic + PANE_HEIGHTS.fearGreed;
+export const TOTAL_CHART_HEIGHT = 900;
 
 export default function CandlestickChart({
   data,
@@ -450,9 +443,7 @@ export default function CandlestickChart({
 
     // Configure all pane heights after series creation
     const panes = chart.panes();
-    panes[0].setHeight(PANE_HEIGHTS.main);
-    panes[1].setHeight(PANE_HEIGHTS.stochastic);
-    panes[2].setHeight(PANE_HEIGHTS.fearGreed);
+    panes[0].setStretchFactor(3);
 
     // Handle resize
     const handleResize = () => {
