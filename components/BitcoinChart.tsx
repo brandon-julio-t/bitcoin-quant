@@ -10,7 +10,6 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { calculateHalvingSignals } from "@/lib/halving-signals";
 import { OHLCV } from "@/lib/indicators";
-import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   ColorType,
@@ -43,6 +42,9 @@ interface BitcoinChartProps {
       d: number[];
     };
   };
+  halvingDates?: string[];
+  isLoadingHalvingDates?: boolean;
+  halvingDatesError?: Error | null;
 }
 
 /**
@@ -361,7 +363,13 @@ function StochasticChart({
  * BitcoinChart component that displays candlestick chart with indicators
  * and stochastic oscillator
  */
-export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
+export default function BitcoinChart({
+  data,
+  indicators,
+  halvingDates,
+  isLoadingHalvingDates = false,
+  halvingDatesError,
+}: BitcoinChartProps) {
   const btcChartRef = useRef<IChartApi | null>(null);
   const stochasticChartRef = useRef<IChartApi | null>(null);
   const btcCandlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(
@@ -369,32 +377,13 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
   );
   const stochasticKSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
 
-  // Fetch halving dates from API
-  const {
-    data: halvingDatesData,
-    isLoading: isLoadingHalvingDates,
-    error: halvingDatesError,
-  } = useQuery<{ halvingDates: string[] }>({
-    queryKey: ["halving-dates"],
-    queryFn: async () => {
-      const response = await fetch("/api/halving-dates");
-      if (!response.ok) {
-        throw new Error("Failed to fetch halving dates");
-      }
-      return response.json();
-    },
-    staleTime: 1000 * 60 * 60 * 24, // 24 hours - halving dates don't change often
-  });
-
   const chartData = useMemo(() => {
     if (!data.length) return [];
-    if (!halvingDatesData?.halvingDates) return [];
+    if (!halvingDates || halvingDates.length === 0) return [];
 
     const dates = data.map((d) => d.date);
     // Convert string dates to Date objects and calculate signals
-    const halvingDatesArray = halvingDatesData.halvingDates.map(
-      (dateStr) => new Date(dateStr)
-    );
+    const halvingDatesArray = halvingDates.map((dateStr) => new Date(dateStr));
     const signals = calculateHalvingSignals(halvingDatesArray);
     const dateRangeStart = new Date(dates[0]);
     const dateRangeEnd = new Date(dates[dates.length - 1]);
@@ -500,7 +489,7 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
           : undefined,
       };
     });
-  }, [data, indicators, halvingDatesData]);
+  }, [data, indicators, halvingDates]);
 
   // Synchronize crosshair between BTC and Stochastic charts
   useEffect(() => {

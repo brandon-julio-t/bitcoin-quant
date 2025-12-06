@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 /**
  * Bitcoin halving constants
@@ -41,64 +41,139 @@ interface BlockData {
 }
 
 /**
+ * Fetch the current Bitcoin block height
+ * Returns the height of the latest block in the blockchain
+ */
+async function fetchCurrentBlockHeight(): Promise<number> {
+  try {
+    const response = await fetch(
+      "https://mempool.space/api/blocks/tip/height",
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch current block height: ${response.statusText}`
+      );
+    }
+
+    const heightText = await response.text();
+    return parseInt(heightText, 10);
+  } catch (error) {
+    console.error("Error fetching current block height:", error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch block hash for a given block height
+ * Returns null if block doesn't exist (future halving)
+ */
+async function fetchBlockHash(blockHeight: number): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `https://mempool.space/api/block-height/${blockHeight}`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      // If block doesn't exist yet (future halving), return null
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`Blockstream API error: ${response.statusText}`);
+    }
+
+    return await response.text();
+  } catch (error) {
+    console.error(`Error fetching block hash for block ${blockHeight}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch block details including timestamp for a given block hash
+ */
+async function fetchBlockDetails(blockHash: string): Promise<BlockData> {
+  const blockResponse = await fetch(
+    `https://mempool.space/api/block/${blockHash}`,
+    {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+      },
+    }
+  );
+
+  if (!blockResponse.ok) {
+    throw new Error(
+      `Failed to fetch block details: ${blockResponse.statusText}`
+    );
+  }
+
+  return await blockResponse.json();
+}
+
+/**
  * Fetch halving dates from Blockstream API
  * Uses actual block timestamps for accurate halving dates
+ * Optimized to fetch blocks in parallel and avoid 404s by checking current block height first
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const halvingDates: Date[] = [];
+    const now = new Date();
 
-    // Fetch block data for each halving block from Blockstream API
-    // Using mempool.space API (based on Esplora) as it's reliable and free
-    for (const blockHeight of HALVING_BLOCKS) {
-      try {
-        const response = await fetch(
-          `https://mempool.space/api/block-height/${blockHeight}`,
-          {
-            headers: {
-              "User-Agent": "Mozilla/5.0",
-            },
-          }
-        );
+    // Fetch current block height to avoid unnecessary API calls for future blocks
+    const currentBlockHeight = await fetchCurrentBlockHeight();
 
-        if (!response.ok) {
-          // If block doesn't exist yet (future halving), skip it
-          if (response.status === 404) {
-            continue;
-          }
-          throw new Error(`Blockstream API error: ${response.statusText}`);
-        }
+    // Filter halving blocks to only include those that exist (<= current block height)
+    const existingHalvingBlocks = HALVING_BLOCKS.filter(
+      (blockHeight) => blockHeight <= currentBlockHeight
+    );
 
-        const blockHash = await response.text();
+    if (existingHalvingBlocks.length === 0) {
+      throw new Error("No halving dates could be fetched");
+    }
 
-        // Fetch block details to get timestamp
-        const blockResponse = await fetch(
-          `https://mempool.space/api/block/${blockHash}`,
-          {
-            headers: {
-              "User-Agent": "Mozilla/5.0",
-            },
-          }
-        );
+    // Fetch all block hashes in parallel (these should all exist, avoiding 404s)
+    const blockHashPromises = existingHalvingBlocks.map((blockHeight) =>
+      fetchBlockHash(blockHeight)
+    );
+    const blockHashes = await Promise.all(blockHashPromises);
 
-        if (!blockResponse.ok) {
-          throw new Error(
-            `Failed to fetch block details: ${blockResponse.statusText}`
-          );
-        }
+    // Filter out any null values (shouldn't happen, but safety check)
+    const validBlockHashes = blockHashes.filter(
+      (hash): hash is string => hash !== null
+    );
 
-        const blockData: BlockData = await blockResponse.json();
+    if (validBlockHashes.length === 0) {
+      throw new Error("No halving dates could be fetched");
+    }
 
-        // Convert Unix timestamp to Date
-        // Blockstream API returns timestamp in seconds
-        const halvingDate = new Date(blockData.timestamp * 1000);
-        halvingDates.push(halvingDate);
-      } catch (error) {
-        // Log error but continue with other blocks
-        console.error(`Error fetching halving block ${blockHeight}:`, error);
-        // For future blocks that don't exist yet, we can estimate
-        // but for now, we'll skip them
+    // Fetch all block details in parallel
+    const blockDetailsPromises = validBlockHashes.map((blockHash) =>
+      fetchBlockDetails(blockHash)
+    );
+    const blockDetailsArray = await Promise.all(blockDetailsPromises);
+
+    // Convert timestamps to dates and filter out future dates
+    for (const blockData of blockDetailsArray) {
+      const halvingDate = new Date(blockData.timestamp * 1000);
+
+      // If date is in the future, stop processing (early return optimization)
+      if (halvingDate > now) {
+        break;
       }
+
+      halvingDates.push(halvingDate);
     }
 
     if (halvingDates.length === 0) {

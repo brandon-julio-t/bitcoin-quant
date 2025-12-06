@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
 import { calculateAllIndicators, OHLCV } from "@/lib/indicators";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useMemo, useState } from "react";
 
@@ -54,6 +54,23 @@ export default function Home() {
       queryFn: () => fetchBitcoinData(tf),
       staleTime: 1000 * 60 * 5, // 5 minutes - data stays fresh for 5 minutes
     })),
+  });
+
+  // Load halving dates in parallel with bitcoin data
+  const {
+    data: halvingDatesData,
+    isLoading: isLoadingHalvingDates,
+    error: halvingDatesError,
+  } = useQuery<{ halvingDates: string[] }>({
+    queryKey: ["halving-dates"],
+    queryFn: async () => {
+      const response = await fetch("/api/halving-dates");
+      if (!response.ok) {
+        throw new Error("Failed to fetch halving dates");
+      }
+      return response.json();
+    },
+    staleTime: 1000 * 60 * 60 * 24, // 24 hours - halving dates don't change often
   });
 
   // Create a map of timeframe to query result for easy access
@@ -133,7 +150,13 @@ export default function Home() {
           bitcoinData &&
           bitcoinData.length > 0 &&
           indicators && (
-            <BitcoinChart data={bitcoinData} indicators={indicators} />
+            <BitcoinChart
+              data={bitcoinData}
+              indicators={indicators}
+              halvingDates={halvingDatesData?.halvingDates}
+              isLoadingHalvingDates={isLoadingHalvingDates}
+              halvingDatesError={halvingDatesError}
+            />
           )}
       </div>
     </main>
