@@ -35,6 +35,7 @@ interface BitcoinChartProps {
   halvingDates?: string[];
   isLoadingHalvingDates?: boolean;
   halvingDatesError?: Error | null;
+  fearGreedData?: Map<string, { value: number; classification: string }>;
 }
 
 /**
@@ -47,6 +48,7 @@ export default function BitcoinChart({
   halvingDates,
   isLoadingHalvingDates = false,
   halvingDatesError,
+  fearGreedData,
 }: BitcoinChartProps) {
   const btcChartRef = useRef<IChartApi | null>(null);
   const btcCandlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(
@@ -133,9 +135,13 @@ export default function BitcoinChart({
     return data.map((point, index) => {
       const pointDate = new Date(point.date);
       const dateKey = pointDate.toISOString();
+      const dateKeyNormalized = pointDate.toISOString().split("T")[0]; // YYYY-MM-DD format
       const isHalving = halvingDateKeys.has(dateKey);
       const isTopSignal = topSignalDates.has(dateKey);
       const isBottomSignal = bottomSignalDates.has(dateKey);
+
+      // Get Fear and Greed data for this date
+      const fearGreedPoint = fearGreedData?.get(dateKeyNormalized);
 
       return {
         date: dateKey,
@@ -154,6 +160,8 @@ export default function BitcoinChart({
         bbLower: indicators.bollinger.lower[index] || null,
         stochasticK: indicators.stochastic.k[index] || null,
         stochasticD: indicators.stochastic.d[index] || null,
+        fearGreedValue: fearGreedPoint?.value || null,
+        fearGreedClassification: fearGreedPoint?.classification || undefined,
         // Signal flags
         isHalving,
         isTopSignal,
@@ -165,7 +173,7 @@ export default function BitcoinChart({
           : undefined,
       };
     });
-  }, [data, indicators, halvingDates]);
+  }, [data, indicators, halvingDates, fearGreedData]);
 
   if (isLoadingHalvingDates || !chartData.length) {
     return (
@@ -203,7 +211,7 @@ export default function BitcoinChart({
       {/* Main Price Chart with Stochastic Oscillator in Panes */}
       <div className="bg-card rounded-lg p-4 border space-y-6">
         <h2 className="text-xl font-bold text-card-foreground mb-4 text-center">
-          Bitcoin (BTC-USD) with Stochastic Oscillator
+          Bitcoin (BTC-USD) with Stochastic Oscillator & Fear and Greed Index
         </h2>
         <CandlestickChart
           data={chartData}

@@ -78,6 +78,21 @@ export default function Home() {
     staleTime: 1000 * 60 * 60 * 24, // 24 hours - halving dates don't change often
   });
 
+  // Load Fear and Greed Index data in parallel
+  const { data: fearGreedData } = useQuery<
+    Array<{ date: string; value: number; classification: string }>
+  >({
+    queryKey: ["fear-greed"],
+    queryFn: async () => {
+      const response = await fetch("/api/fear-greed");
+      if (!response.ok) {
+        throw new Error("Failed to fetch Fear and Greed data");
+      }
+      return response.json();
+    },
+    staleTime: 1000 * 60 * 60, // 1 hour - fear and greed updates daily
+  });
+
   // Calculate indicators for each timeframe
   const indicatorsMap = useMemo(() => {
     const map = new Map<string, ReturnType<typeof calculateAllIndicators>>();
@@ -89,6 +104,22 @@ export default function Home() {
     });
     return map;
   }, [timeframeQueries]);
+
+  // Create a map of Fear and Greed data by date for quick lookup
+  const fearGreedMap = useMemo(() => {
+    if (!fearGreedData)
+      return new Map<string, { value: number; classification: string }>();
+    const map = new Map<string, { value: number; classification: string }>();
+    fearGreedData.forEach((point) => {
+      // Normalize date to YYYY-MM-DD format for matching
+      const dateKey = new Date(point.date).toISOString().split("T")[0];
+      map.set(dateKey, {
+        value: point.value,
+        classification: point.classification,
+      });
+    });
+    return map;
+  }, [fearGreedData]);
 
   return (
     <main className="min-h-screen bg-background text-foreground p-4 md:p-8">
@@ -158,6 +189,7 @@ export default function Home() {
                       halvingDates={halvingDatesData?.halvingDates}
                       isLoadingHalvingDates={isLoadingHalvingDates}
                       halvingDatesError={halvingDatesError}
+                      fearGreedData={fearGreedMap}
                     />
                   )}
               </TabsContent>

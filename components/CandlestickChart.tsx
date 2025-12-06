@@ -35,6 +35,8 @@ interface CandlestickChartProps {
     bbLower: number | null;
     stochasticK?: number | null;
     stochasticD?: number | null;
+    fearGreedValue?: number | null;
+    fearGreedClassification?: string;
     // Signal flags
     isHalving?: boolean;
     isTopSignal?: boolean;
@@ -51,6 +53,17 @@ interface CandlestickChartProps {
  * CandlestickChart component using TradingView Lightweight Charts
  * Displays candlestick data with EMAs, Bollinger Bands, and signal markers
  */
+
+// Centralized pane height configuration
+export const PANE_HEIGHTS = {
+  main: 500, // Main price chart pane
+  stochastic: 150, // Stochastic oscillator pane
+  fearGreed: 150, // Fear and Greed Index pane
+} as const;
+
+export const TOTAL_CHART_HEIGHT =
+  PANE_HEIGHTS.main + PANE_HEIGHTS.stochastic + PANE_HEIGHTS.fearGreed;
+
 export default function CandlestickChart({
   data,
   onChartReady,
@@ -71,6 +84,12 @@ export default function CandlestickChart({
   const stochasticDSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const stochasticOverboughtLineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const stochasticOversoldLineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const fearGreedSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const fearGreedExtremeFearLineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const fearGreedFearLineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const fearGreedNeutralLineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const fearGreedGreedLineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const fearGreedExtremeGreedLineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const [isLogarithmic, setIsLogarithmic] = useState(false);
 
   useEffect(() => {
@@ -92,7 +111,7 @@ export default function CandlestickChart({
         horzLines: { color: "rgba(255, 255, 255, 0.1)" },
       },
       width: chartContainerRef.current.clientWidth,
-      height: 600,
+      height: TOTAL_CHART_HEIGHT,
       rightPriceScale: {
         borderColor: "#ffffff",
         scaleMargins: {
@@ -326,13 +345,118 @@ export default function CandlestickChart({
     );
     stochasticDSeriesRef.current = stochasticDSeries;
 
-    // Configure stochastic pane height
     // Note: Price scale for pane 1 will be auto-configured based on the series data
     // The stochastic series will automatically use the right price scale of pane 1
-    const stochasticPane = chart.panes()[1];
-    if (stochasticPane) {
-      stochasticPane.setHeight(200);
-    }
+
+    // Create Fear and Greed Index series in pane 2
+    // Extreme Fear line (25)
+    const fearGreedExtremeFearLine = chart.addSeries(
+      LineSeries,
+      {
+        color: "#dc2626",
+        lineWidth: 1,
+        lineStyle: 1, // Dashed
+        title: "",
+        priceFormat: {
+          type: "price",
+          precision: 0,
+          minMove: 1,
+        },
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      2 // Pane index 2
+    );
+    fearGreedExtremeFearLineRef.current = fearGreedExtremeFearLine;
+
+    // Fear line (45)
+    const fearGreedFearLine = chart.addSeries(
+      LineSeries,
+      {
+        color: "#ea580c",
+        lineWidth: 1,
+        lineStyle: 1, // Dashed
+        title: "",
+        priceFormat: {
+          type: "price",
+          precision: 0,
+          minMove: 1,
+        },
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      2 // Pane index 2
+    );
+    fearGreedFearLineRef.current = fearGreedFearLine;
+
+    // Neutral line (55)
+    const fearGreedNeutralLine = chart.addSeries(
+      LineSeries,
+      {
+        color: "#f59e0b",
+        lineWidth: 1,
+        lineStyle: 1, // Dashed
+        title: "",
+        priceFormat: {
+          type: "price",
+          precision: 0,
+          minMove: 1,
+        },
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      2 // Pane index 2
+    );
+    fearGreedNeutralLineRef.current = fearGreedNeutralLine;
+
+    // Greed line (75)
+    const fearGreedGreedLine = chart.addSeries(
+      LineSeries,
+      {
+        color: "#16a34a",
+        lineWidth: 1,
+        lineStyle: 1, // Dashed
+        title: "",
+        priceFormat: {
+          type: "price",
+          precision: 0,
+          minMove: 1,
+        },
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      2 // Pane index 2
+    );
+    fearGreedGreedLineRef.current = fearGreedGreedLine;
+
+    // Fear and Greed Index line
+    const fearGreedSeries = chart.addSeries(
+      LineSeries,
+      {
+        color: "rgba(139, 92, 246, 1)",
+        lineWidth: 2,
+        title: "",
+        priceFormat: {
+          type: "price",
+          precision: 0,
+          minMove: 1,
+        },
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      2 // Pane index 2
+    );
+    fearGreedSeriesRef.current = fearGreedSeries;
+
+    // Configure all pane heights after series creation
+    const panes = chart.panes();
+    // if (panes.length >= 3) {
+    //   // Pane 1 is stochastic
+    panes[0].setHeight(PANE_HEIGHTS.main);
+    // panes[1].setHeight(PANE_HEIGHTS.stochastic);
+    //   // Pane 2 is fear and greed
+    // panes[2].setHeight(PANE_HEIGHTS.fearGreed);
+    // }
 
     // Handle resize
     const handleResize = () => {
@@ -372,6 +496,12 @@ export default function CandlestickChart({
     const stochasticDData: LineData<Time>[] = [];
     const stochasticOverboughtData: LineData<Time>[] = [];
     const stochasticOversoldData: LineData<Time>[] = [];
+    const fearGreedData: LineData<Time>[] = [];
+    const fearGreedExtremeFearData: LineData<Time>[] = [];
+    const fearGreedFearData: LineData<Time>[] = [];
+    const fearGreedNeutralData: LineData<Time>[] = [];
+    const fearGreedGreedData: LineData<Time>[] = [];
+    const fearGreedExtremeGreedData: LineData<Time>[] = [];
 
     // Minimum value for logarithmic scale to avoid log(0) or log(negative) issues
     const MIN_LOG_VALUE = 0.01;
@@ -439,6 +569,18 @@ export default function CandlestickChart({
       // Stochastic reference lines (80 and 20)
       stochasticOverboughtData.push({ time: timestamp, value: 80 });
       stochasticOversoldData.push({ time: timestamp, value: 20 });
+
+      // Fear and Greed Index data
+      if (point.fearGreedValue !== null && point.fearGreedValue !== undefined) {
+        fearGreedData.push({ time: timestamp, value: point.fearGreedValue });
+      }
+
+      // Fear and Greed reference lines
+      fearGreedExtremeFearData.push({ time: timestamp, value: 25 });
+      fearGreedFearData.push({ time: timestamp, value: 45 });
+      fearGreedNeutralData.push({ time: timestamp, value: 55 });
+      fearGreedGreedData.push({ time: timestamp, value: 75 });
+      fearGreedExtremeGreedData.push({ time: timestamp, value: 100 });
     });
 
     // Set data to series
@@ -454,23 +596,12 @@ export default function CandlestickChart({
     stochasticDSeriesRef.current?.setData(stochasticDData);
     stochasticOverboughtLineRef.current?.setData(stochasticOverboughtData);
     stochasticOversoldLineRef.current?.setData(stochasticOversoldData);
-
-    // Configure price scale for stochastic pane (pane 1) after data is set
-    // The price scale will auto-scale based on the stochastic data (0-100 range)
-    if (chartRef.current && chartRef.current.panes().length > 1) {
-      try {
-        // Access the price scale for pane 1's right price scale
-        // Note: Each pane has its own price scales
-        const stochasticPane = chartRef.current.panes()[1];
-        if (stochasticPane) {
-          // The price scale is automatically configured when series are added to a pane
-          // Auto-scaling is enabled by default, which will fit the 0-100 range
-        }
-      } catch (error) {
-        // Price scale configuration is optional - auto-scaling will handle it
-        console.debug("Price scale configuration for stochastic pane:", error);
-      }
-    }
+    fearGreedSeriesRef.current?.setData(fearGreedData);
+    fearGreedExtremeFearLineRef.current?.setData(fearGreedExtremeFearData);
+    fearGreedFearLineRef.current?.setData(fearGreedFearData);
+    fearGreedNeutralLineRef.current?.setData(fearGreedNeutralData);
+    fearGreedGreedLineRef.current?.setData(fearGreedGreedData);
+    fearGreedExtremeGreedLineRef.current?.setData(fearGreedExtremeGreedData);
 
     // Add markers for halving dates and signals
     type ChartMarker = {
@@ -585,7 +716,7 @@ export default function CandlestickChart({
       <div
         ref={chartContainerRef}
         className="w-full"
-        style={{ height: "600px" }}
+        style={{ height: `${TOTAL_CHART_HEIGHT}px` }}
       />
     </div>
   );
