@@ -18,6 +18,7 @@ import {
   findNearestCandlestick,
 } from "@/lib/halving-signals";
 import { useMemo } from "react";
+import { format } from "date-fns";
 import CandlestickChart from "./CandlestickChart";
 
 interface BitcoinChartProps {
@@ -51,7 +52,7 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
     // Prepare data points with all indicators
     return data.map((point, index) => ({
       date: new Date(point.date).toISOString(),
-      dateLabel: new Date(point.date).toLocaleDateString(),
+      dateLabel: format(new Date(point.date), "d MMM yyyy"),
       open: point.open,
       high: point.high,
       low: point.low,
@@ -70,12 +71,11 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
   }, [data, indicators]);
 
   const referenceLines = useMemo(() => {
-    if (!data.length) return [];
+    if (!data.length || !chartData.length) return [];
 
-    const dates = data.map((d) => d.date);
     const signals = getBitcoinHalvingSignals();
-    const dateRangeStart = new Date(dates[0]);
-    const dateRangeEnd = new Date(dates[dates.length - 1]);
+    const dateRangeStart = new Date(data[0].date);
+    const dateRangeEnd = new Date(data[data.length - 1].date);
     const lines: Array<{
       x: string;
       stroke: string;
@@ -83,47 +83,77 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
       label?: string;
     }> = [];
 
+    // Helper function to find the exact matching dateLabel
+    // This ensures the reference line aligns perfectly with the candlestick center
+    const findNearestDateLabel = (targetDate: Date): string | null => {
+      if (!chartData.length) return null;
+
+      let nearestDataPoint = chartData[0];
+      let minDiff = Math.abs(
+        new Date(chartData[0].date).getTime() - targetDate.getTime()
+      );
+
+      for (const point of chartData) {
+        const pointDate = new Date(point.date);
+        const diff = Math.abs(pointDate.getTime() - targetDate.getTime());
+        if (diff < minDiff) {
+          minDiff = diff;
+          nearestDataPoint = point;
+        }
+      }
+
+      // Return the exact dateLabel string from the chart data
+      // This must match exactly for Recharts to center the line on the candlestick
+      return nearestDataPoint.dateLabel;
+    };
+
     // Halving dates
     signals.halvings.forEach((halvingDate, i) => {
       if (halvingDate >= dateRangeStart && halvingDate <= dateRangeEnd) {
-        const alignedDate = findNearestCandlestick(halvingDate, dates);
-        lines.push({
-          x: alignedDate,
-          stroke: "rgba(255, 255, 0, 0.8)",
-          strokeDasharray: "5 5",
-          label: `Halving ${i + 1}`,
-        });
+        const dateLabel = findNearestDateLabel(halvingDate);
+        if (dateLabel) {
+          lines.push({
+            x: dateLabel,
+            stroke: "rgba(255, 255, 0, 0.8)",
+            strokeDasharray: "5 5",
+            label: `Halving ${i + 1}`,
+          });
+        }
       }
     });
 
-    // Top signals
+    // Top signals (17 months / ~518 days after halving)
     signals.topSignals.forEach((topSignal, i) => {
       if (topSignal >= dateRangeStart && topSignal <= dateRangeEnd) {
-        const alignedDate = findNearestCandlestick(topSignal, dates);
-        lines.push({
-          x: alignedDate,
-          stroke: "rgba(0, 255, 0, 0.8)",
-          strokeDasharray: "10 5",
-          label: `Top ${i + 1}`,
-        });
+        const dateLabel = findNearestDateLabel(topSignal);
+        if (dateLabel) {
+          lines.push({
+            x: dateLabel,
+            stroke: "rgba(0, 255, 0, 0.8)",
+            strokeDasharray: "10 5",
+            label: `Top ${i + 1}`,
+          });
+        }
       }
     });
 
-    // Bottom signals
+    // Bottom signals (29 months / ~883 days after halving)
     signals.bottomSignals.forEach((bottomSignal, i) => {
       if (bottomSignal >= dateRangeStart && bottomSignal <= dateRangeEnd) {
-        const alignedDate = findNearestCandlestick(bottomSignal, dates);
-        lines.push({
-          x: alignedDate,
-          stroke: "rgba(255, 0, 0, 0.8)",
-          strokeDasharray: "10 5",
-          label: `Bottom ${i + 1}`,
-        });
+        const dateLabel = findNearestDateLabel(bottomSignal);
+        if (dateLabel) {
+          lines.push({
+            x: dateLabel,
+            stroke: "rgba(255, 0, 0, 0.8)",
+            strokeDasharray: "10 5",
+            label: `Bottom ${i + 1}`,
+          });
+        }
       }
     });
 
     return lines;
-  }, [data]);
+  }, [data, chartData]);
 
   if (!chartData.length) {
     return (
@@ -177,6 +207,7 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
               domain={[0, 100]}
               stroke="#ffffff"
               tick={{ fill: "#ffffff" }}
+              tickFormatter={(value) => value.toLocaleString()}
               label={{
                 value: "Stochastic %",
                 angle: -90,
@@ -193,6 +224,14 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
                 color: "#ffffff",
               }}
               labelStyle={{ color: "#9ca3af" }}
+              formatter={(value: any) => {
+                return typeof value === "number"
+                  ? value.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                  : value;
+              }}
             />
             <Line
               type="monotone"
