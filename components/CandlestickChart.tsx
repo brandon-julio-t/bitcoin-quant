@@ -173,7 +173,7 @@ const CandlestickShape = (props: CandlestickShapeProps) => {
             x2={x}
             y2={plotAreaBottom}
             stroke={signalStroke}
-            strokeWidth={1.5}
+            strokeWidth={1}
             strokeDasharray={signalDashArray}
           />
           {/* Label at the top */}
@@ -184,7 +184,6 @@ const CandlestickShape = (props: CandlestickShapeProps) => {
               fill={signalStroke}
               fontSize={11}
               textAnchor="middle"
-              dominantBaseline="hanging"
             >
               {signalLabel}
             </text>
