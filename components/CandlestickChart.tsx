@@ -255,12 +255,6 @@ export default function CandlestickChart({
           tick={{ fill: "#ffffff" }}
           tickFormatter={(value) => value.toLocaleString()}
           width={80}
-          label={{
-            value: "Price (USD)",
-            angle: -90,
-            position: "insideLeft",
-            style: { fill: "#ffffff" },
-          }}
         />
         <Tooltip
           contentStyle={{
