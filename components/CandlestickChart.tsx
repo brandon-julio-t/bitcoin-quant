@@ -139,7 +139,7 @@ export default function CandlestickChart({
     // Create EMA series
     const ema13Series = chart.addSeries(LineSeries, {
       color: "rgba(33, 150, 243, 1)",
-      lineWidth: 2,
+      lineWidth: 1,
       title: "",
       priceFormat: {
         type: "price",
@@ -153,7 +153,7 @@ export default function CandlestickChart({
 
     const ema21Series = chart.addSeries(LineSeries, {
       color: "rgba(255, 152, 0, 1)",
-      lineWidth: 2,
+      lineWidth: 1,
       title: "",
       priceFormat: {
         type: "price",
@@ -167,7 +167,7 @@ export default function CandlestickChart({
 
     const ema50Series = chart.addSeries(LineSeries, {
       color: "rgba(156, 39, 176, 1)",
-      lineWidth: 2,
+      lineWidth: 1,
       title: "",
       priceFormat: {
         type: "price",
@@ -181,7 +181,7 @@ export default function CandlestickChart({
 
     const ema100Series = chart.addSeries(LineSeries, {
       color: "rgba(255, 193, 7, 1)",
-      lineWidth: 2,
+      lineWidth: 1,
       title: "",
       priceFormat: {
         type: "price",
@@ -368,7 +368,7 @@ export default function CandlestickChart({
         markers.push({
           time: timestamp,
           position: "aboveBar",
-          color: "#10b981",
+          color: "#ef4444",
           shape: "arrowDown",
           size: 2,
           text: point.topSignalLabel || "Top Signal",
@@ -379,7 +379,7 @@ export default function CandlestickChart({
         markers.push({
           time: timestamp,
           position: "belowBar",
-          color: "#ef4444",
+          color: "#10b981",
           shape: "arrowUp",
           size: 2,
           text: point.bottomSignalLabel || "Bottom Signal",

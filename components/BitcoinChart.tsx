@@ -418,25 +418,25 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
     });
 
     // Process top signals
-    signals.topSignals.forEach((topSignal, i) => {
+    signals.topSignals.forEach((topSignal) => {
       if (topSignal >= dateRangeStart && topSignal <= dateRangeEnd) {
         const nearestDate = findNearestCandlestickDate(topSignal);
         if (nearestDate) {
           const dateKey = nearestDate.toISOString();
           topSignalDates.add(dateKey);
-          topSignalLabels.set(dateKey, `Top ${i + 1}`);
+          topSignalLabels.set(dateKey, "Top");
         }
       }
     });
 
     // Process bottom signals
-    signals.bottomSignals.forEach((bottomSignal, i) => {
+    signals.bottomSignals.forEach((bottomSignal) => {
       if (bottomSignal >= dateRangeStart && bottomSignal <= dateRangeEnd) {
         const nearestDate = findNearestCandlestickDate(bottomSignal);
         if (nearestDate) {
           const dateKey = nearestDate.toISOString();
           bottomSignalDates.add(dateKey);
-          bottomSignalLabels.set(dateKey, `Bottom ${i + 1}`);
+          bottomSignalLabels.set(dateKey, "Bottom");
         }
       }
     });
