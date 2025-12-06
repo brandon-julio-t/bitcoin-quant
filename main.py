@@ -149,6 +149,43 @@ def calculate_stochastic(
     return k_percent, d_percent
 
 
+def get_bitcoin_halving_signals():
+    """
+    Get Bitcoin halving dates and calculate top/bottom signals.
+
+    Returns:
+        Dictionary with halving dates, top signals, and bottom signals
+    """
+    # Bitcoin halving dates
+    halving_dates = [
+        datetime(2012, 11, 28),
+        datetime(2016, 7, 9),
+        datetime(2020, 5, 11),
+        datetime(2024, 4, 20),
+    ]
+
+    # Calculate signals for each halving
+    top_signals = []
+    bottom_signals = []
+
+    for halving_date in halving_dates:
+        # Top signal: 17 months (~518 days) after halving month
+        # Using exact day count: 518 days
+        top_signal = halving_date + timedelta(days=518)
+        top_signals.append(top_signal)
+
+        # Bottom signal: 29 months (~883 days) after halving month
+        # Using exact day count: 883 days
+        bottom_signal = halving_date + timedelta(days=883)
+        bottom_signals.append(bottom_signal)
+
+    return {
+        "halvings": halving_dates,
+        "top_signals": top_signals,
+        "bottom_signals": bottom_signals,
+    }
+
+
 def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculate all technical indicators: Bollinger Bands, EMAs, and Stochastic.
@@ -323,6 +360,128 @@ def create_tradingview_chart(df: pd.DataFrame) -> go.Figure:
         col=1,
     )
 
+    # Add Bitcoin halving signals
+    signals = get_bitcoin_halving_signals()
+    # Ensure timezone-naive timestamps for comparison
+    date_range_start = (
+        pd.Timestamp(df.index.min()).tz_localize(None)
+        if df.index.tz
+        else pd.Timestamp(df.index.min())
+    )
+    date_range_end = (
+        pd.Timestamp(df.index.max()).tz_localize(None)
+        if df.index.tz
+        else pd.Timestamp(df.index.max())
+    )
+
+    # Get price range for annotation positioning
+    price_min = df["Low"].min()
+    price_max = df["High"].max()
+    price_range = price_max - price_min
+
+    # Helper function to find nearest candlestick timestamp
+    def find_nearest_candlestick(target_date: pd.Timestamp) -> pd.Timestamp:
+        """Find the nearest candlestick timestamp to align vertical lines."""
+        # Ensure timezone compatibility
+        target_ts = pd.Timestamp(target_date)
+        if df.index.tz is not None:
+            # If index is timezone-aware, make target timezone-aware
+            if target_ts.tz is None:
+                target_ts = target_ts.tz_localize(df.index.tz)
+        else:
+            # If index is timezone-naive, make target timezone-naive
+            if target_ts.tz is not None:
+                target_ts = target_ts.tz_localize(None)
+
+        # Find the index of the nearest timestamp
+        idx = df.index.get_indexer([target_ts], method="nearest")[0]
+        return df.index[idx]
+
+    # Add halving date vertical lines using shapes
+    # Align to nearest candlestick for perfect alignment
+    for i, halving_date in enumerate(signals["halvings"]):
+        halving_ts = pd.Timestamp(halving_date)
+        if date_range_start <= halving_ts <= date_range_end:
+            # Align to nearest candlestick
+            aligned_ts = find_nearest_candlestick(halving_ts)
+            fig.add_shape(
+                type="line",
+                x0=aligned_ts,
+                x1=aligned_ts,
+                y0=price_min,
+                y1=price_max,
+                xref="x",
+                yref="y",
+                line=dict(color="rgba(255, 255, 0, 0.8)", width=1, dash="dot"),
+                layer="above",
+            )
+            fig.add_annotation(
+                x=aligned_ts,
+                y=price_max,
+                xref="x",
+                yref="y",
+                text=f"Halving {i+1}",
+                showarrow=False,
+                yshift=10,
+                font=dict(color="rgba(255, 255, 0, 1.0)", size=11),
+            )
+
+    # Add top signal vertical lines (17 months after halving)
+    for i, top_signal in enumerate(signals["top_signals"]):
+        top_ts = pd.Timestamp(top_signal)
+        if date_range_start <= top_ts <= date_range_end:
+            # Align to nearest candlestick
+            aligned_ts = find_nearest_candlestick(top_ts)
+            fig.add_shape(
+                type="line",
+                x0=aligned_ts,
+                x1=aligned_ts,
+                y0=price_min,
+                y1=price_max,
+                xref="x",
+                yref="y",
+                line=dict(color="rgba(0, 255, 0, 0.8)", width=1, dash="dash"),
+                layer="above",
+            )
+            fig.add_annotation(
+                x=aligned_ts,
+                y=price_max,
+                xref="x",
+                yref="y",
+                text=f"Top {i+1}",
+                showarrow=False,
+                yshift=10,
+                font=dict(color="rgba(0, 255, 0, 1.0)", size=11),
+            )
+
+    # Add bottom signal vertical lines (29 months after halving)
+    for i, bottom_signal in enumerate(signals["bottom_signals"]):
+        bottom_ts = pd.Timestamp(bottom_signal)
+        if date_range_start <= bottom_ts <= date_range_end:
+            # Align to nearest candlestick
+            aligned_ts = find_nearest_candlestick(bottom_ts)
+            fig.add_shape(
+                type="line",
+                x0=aligned_ts,
+                x1=aligned_ts,
+                y0=price_min,
+                y1=price_max,
+                xref="x",
+                yref="y",
+                line=dict(color="rgba(255, 0, 0, 0.8)", width=1, dash="dash"),
+                layer="above",
+            )
+            fig.add_annotation(
+                x=aligned_ts,
+                y=price_min,
+                xref="x",
+                yref="y",
+                text=f"Bottom {i+1}",
+                showarrow=False,
+                yshift=-10,
+                font=dict(color="rgba(255, 0, 0, 1.0)", size=11),
+            )
+
     # Update layout for TradingView-like appearance
     fig.update_layout(
         title={
@@ -452,9 +611,9 @@ def create_dash_app():
     </html>
     """
 
-    # Calculate default date range (5 years ago to today)
+    # Calculate default date range (10 years ago to today)
     default_end = datetime.now().date()
-    default_start = (datetime.now() - timedelta(days=1825)).date()
+    default_start = (datetime.now() - timedelta(days=3650)).date()
 
     app.layout = dbc.Container(
         [
@@ -489,7 +648,7 @@ def create_dash_app():
                                     {"label": "1 Week", "value": "1w"},
                                     {"label": "1 Month", "value": "1m"},
                                 ],
-                                value="1w",
+                                value="1m",
                                 clearable=False,
                                 style={
                                     "backgroundColor": "#2c3e50",
@@ -563,7 +722,7 @@ def create_dash_app():
                             ),
                             html.Div(
                                 [
-                                    dcc.Store(id="active-preset-store", data="5y"),
+                                    dcc.Store(id="active-preset-store", data="10y"),
                                     dbc.ButtonGroup(
                                         [
                                             dbc.Button(
@@ -859,9 +1018,9 @@ def create_dash_app():
         base_class = "preset-btn"
         active_class = f"{base_class} active"
 
-        # Default to "5y" if active_preset is None (initial load)
+        # Default to "10y" if active_preset is None (initial load)
         if active_preset is None:
-            active_preset = "5y"
+            active_preset = "10y"
 
         return [
             active_class if active_preset == "1d" else base_class,
