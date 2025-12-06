@@ -11,17 +11,16 @@ import { Spinner } from "@/components/ui/spinner";
 import { getBitcoinHalvingSignals } from "@/lib/halving-signals";
 import { OHLCV } from "@/lib/indicators";
 import { format } from "date-fns";
-import { useMemo } from "react";
 import {
-  CartesianGrid,
-  ComposedChart,
-  Line,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+  ColorType,
+  createChart,
+  IChartApi,
+  ISeriesApi,
+  LineData,
+  LineSeries,
+  Time,
+} from "lightweight-charts";
+import { useEffect, useMemo, useRef } from "react";
 import CandlestickChart from "./CandlestickChart";
 
 interface BitcoinChartProps {
@@ -43,6 +42,195 @@ interface BitcoinChartProps {
   };
 }
 
+/**
+ * Stochastic Oscillator Chart component using TradingView Lightweight Charts
+ */
+function StochasticChart({
+  data,
+}: {
+  data: Array<{
+    date: string;
+    dateLabel: string;
+    stochasticK: number | null;
+    stochasticD: number | null;
+  }>;
+}) {
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const kSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const dSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const overboughtLineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const oversoldLineRef = useRef<ISeriesApi<"Line"> | null>(null);
+
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
+
+    // Create chart instance
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: "transparent" },
+        textColor: "#ffffff",
+      },
+      grid: {
+        vertLines: { color: "rgba(255, 255, 255, 0.1)" },
+        horzLines: { color: "rgba(255, 255, 255, 0.1)" },
+      },
+      width: chartContainerRef.current.clientWidth,
+      height: 200,
+      rightPriceScale: {
+        borderColor: "#ffffff",
+        scaleMargins: {
+          top: 0.1,
+          bottom: 0.1,
+        },
+        visible: true,
+      },
+      leftPriceScale: {
+        visible: false,
+      },
+      timeScale: {
+        borderColor: "#ffffff",
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      crosshair: {
+        mode: 1, // Normal mode
+      },
+    });
+
+    chartRef.current = chart;
+
+    // Configure price scale
+    chart.priceScale("right").applyOptions({
+      autoScale: false,
+      scaleMargins: {
+        top: 0.1,
+        bottom: 0.1,
+      },
+    });
+
+    // Create horizontal reference lines
+    const overboughtLine = chart.addSeries(LineSeries, {
+      color: "#ef5350",
+      lineWidth: 1,
+      lineStyle: 1, // Dashed
+      priceFormat: {
+        type: "price",
+        precision: 0,
+        minMove: 1,
+      },
+    });
+    overboughtLineRef.current = overboughtLine;
+
+    const oversoldLine = chart.addSeries(LineSeries, {
+      color: "#26a69a",
+      lineWidth: 1,
+      lineStyle: 1, // Dashed
+      priceFormat: {
+        type: "price",
+        precision: 0,
+        minMove: 1,
+      },
+    });
+    oversoldLineRef.current = oversoldLine;
+
+    // Create %K series
+    const kSeries = chart.addSeries(LineSeries, {
+      color: "rgba(33, 150, 243, 1)",
+      lineWidth: 1,
+      title: "%K",
+      priceFormat: {
+        type: "price",
+        precision: 2,
+        minMove: 0.01,
+      },
+    });
+    kSeriesRef.current = kSeries;
+
+    // Create %D series
+    const dSeries = chart.addSeries(LineSeries, {
+      color: "rgba(255, 152, 0, 1)",
+      lineWidth: 1,
+      title: "%D",
+      priceFormat: {
+        type: "price",
+        precision: 2,
+        minMove: 0.01,
+      },
+    });
+    dSeriesRef.current = dSeries;
+
+    // Handle resize
+    const handleResize = () => {
+      if (chartContainerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({
+          width: chartContainerRef.current.clientWidth,
+        });
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    // Cleanup function
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update chart data when data prop changes
+  useEffect(() => {
+    if (!data.length || !chartRef.current) return;
+
+    // Convert data to TradingView format
+    const kData: LineData<Time>[] = [];
+    const dData: LineData<Time>[] = [];
+    const overboughtData: LineData<Time>[] = [];
+    const oversoldData: LineData<Time>[] = [];
+
+    data.forEach((point) => {
+      const timestamp = Math.floor(
+        new Date(point.date).getTime() / 1000
+      ) as Time;
+
+      if (point.stochasticK !== null) {
+        kData.push({ time: timestamp, value: point.stochasticK });
+      }
+      if (point.stochasticD !== null) {
+        dData.push({ time: timestamp, value: point.stochasticD });
+      }
+
+      // Reference lines
+      overboughtData.push({ time: timestamp, value: 80 });
+      oversoldData.push({ time: timestamp, value: 20 });
+    });
+
+    // Set data to series
+    kSeriesRef.current?.setData(kData);
+    dSeriesRef.current?.setData(dData);
+    overboughtLineRef.current?.setData(overboughtData);
+    oversoldLineRef.current?.setData(oversoldData);
+
+    // Fit content
+    chartRef.current.timeScale().fitContent();
+  }, [data]);
+
+  return (
+    <div
+      ref={chartContainerRef}
+      className="w-full"
+      style={{ height: "200px" }}
+    />
+  );
+}
+
+/**
+ * BitcoinChart component that displays candlestick chart with indicators
+ * and stochastic oscillator
+ */
 export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
   const chartData = useMemo(() => {
     if (!data.length) return [];
@@ -186,73 +374,12 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
         />
 
         {/* Stochastic Oscillator */}
-        <ResponsiveContainer width="100%" height={200}>
-          <ComposedChart
-            data={chartData}
-            margin={{ top: 10, right: 30, left: 20, bottom: 10 }}
-          >
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="rgba(255, 255, 255, 0.1)"
-            />
-            <XAxis
-              dataKey="dateLabel"
-              stroke="#ffffff"
-              tick={{ fill: "#ffffff" }}
-              angle={-45}
-              textAnchor="end"
-              height={80}
-            />
-            <YAxis
-              domain={[0, 100]}
-              stroke="#ffffff"
-              tick={{ fill: "#ffffff" }}
-              tickFormatter={(value) => value.toLocaleString()}
-              label={{
-                value: "Stochastic %",
-                angle: -90,
-                position: "insideLeft",
-                style: { fill: "#ffffff" },
-              }}
-            />
-            <ReferenceLine y={80} stroke="#ef5350" strokeDasharray="3 3" />
-            <ReferenceLine y={20} stroke="#26a69a" strokeDasharray="3 3" />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "#1f2937",
-                border: "1px solid #374151",
-                color: "#ffffff",
-              }}
-              labelStyle={{ color: "#9ca3af" }}
-              formatter={(value: number | string) => {
-                return typeof value === "number"
-                  ? value.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })
-                  : value;
-              }}
-            />
-            <Line
-              type="monotone"
-              dataKey="stochasticK"
-              stroke="rgba(33, 150, 243, 1)"
-              strokeWidth={1}
-              dot={false}
-              name="%K"
-              connectNulls
-            />
-            <Line
-              type="monotone"
-              dataKey="stochasticD"
-              stroke="rgba(255, 152, 0, 1)"
-              strokeWidth={1}
-              dot={false}
-              name="%D"
-              connectNulls
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold text-card-foreground mb-2 text-center">
+            Stochastic Oscillator
+          </h3>
+          <StochasticChart data={chartData} />
+        </div>
       </div>
     </div>
   );

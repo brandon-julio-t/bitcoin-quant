@@ -1,13 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -15,95 +8,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-import { format, startOfYear, subDays, subMonths, subYears } from "date-fns";
-import { CalendarIcon } from "lucide-react";
 
 interface ChartControlsProps {
   timeframe: string;
-  startDate: string;
-  endDate: string;
-  activePreset: string;
   onTimeframeChange: (timeframe: string) => void;
-  onStartDateChange: (date: string) => void;
-  onEndDateChange: (date: string) => void;
-  onPresetClick: (preset: string) => void;
-  onUpdate: () => void;
 }
 
-const presets = [
-  { id: "1d", label: "1D" },
-  { id: "1w", label: "1W" },
-  { id: "1m", label: "1M" },
-  { id: "3m", label: "3M" },
-  { id: "6m", label: "6M" },
-  { id: "ytd", label: "YTD" },
-  { id: "1y", label: "1Y" },
-  { id: "2y", label: "2Y" },
-  { id: "5y", label: "5Y" },
-  { id: "10y", label: "10Y" },
-];
-
+/**
+ * ChartControls component for selecting chart timeframe
+ * Date range is fixed from Bitcoin's birth (Jan 3, 2009) to now
+ */
 export default function ChartControls({
   timeframe,
-  startDate,
-  endDate,
-  activePreset,
   onTimeframeChange,
-  onStartDateChange,
-  onEndDateChange,
-  onPresetClick,
-  onUpdate,
 }: ChartControlsProps) {
-  const handlePresetClick = (presetId: string) => {
-    const today = new Date();
-    let newStartDate = startDate;
-    const newEndDate = format(today, "yyyy-MM-dd");
-
-    switch (presetId) {
-      case "1d":
-        newStartDate = format(subDays(today, 1), "yyyy-MM-dd");
-        break;
-      case "1w":
-        newStartDate = format(subDays(today, 7), "yyyy-MM-dd");
-        break;
-      case "1m":
-        newStartDate = format(subMonths(today, 1), "yyyy-MM-dd");
-        break;
-      case "3m":
-        newStartDate = format(subMonths(today, 3), "yyyy-MM-dd");
-        break;
-      case "6m":
-        newStartDate = format(subMonths(today, 6), "yyyy-MM-dd");
-        break;
-      case "ytd":
-        newStartDate = format(startOfYear(today), "yyyy-MM-dd");
-        break;
-      case "1y":
-        newStartDate = format(subYears(today, 1), "yyyy-MM-dd");
-        break;
-      case "2y":
-        newStartDate = format(subYears(today, 2), "yyyy-MM-dd");
-        break;
-      case "5y":
-        newStartDate = format(subYears(today, 5), "yyyy-MM-dd");
-        break;
-      case "10y":
-        newStartDate = format(subYears(today, 10), "yyyy-MM-dd");
-        break;
-    }
-
-    onStartDateChange(newStartDate);
-    onEndDateChange(newEndDate);
-    onPresetClick(presetId);
-  };
-
-  const startDateObj = startDate ? new Date(startDate) : undefined;
-  const endDateObj = endDate ? new Date(endDate) : undefined;
-
   return (
     <div className="space-y-4 mb-6">
-      {/* Timeframe and Date Controls */}
       <FieldGroup className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Field>
           <FieldLabel htmlFor="timeframe-select">Timeframe</FieldLabel>
@@ -119,103 +39,7 @@ export default function ChartControls({
             </SelectContent>
           </Select>
         </Field>
-
-        <Field>
-          <FieldLabel htmlFor="start-date-picker">Start Date</FieldLabel>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                id="start-date-picker"
-                variant="outline"
-                className={cn(
-                  "w-full justify-start text-left font-normal",
-                  !startDateObj && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {startDateObj ? (
-                  format(startDateObj, "PPP")
-                ) : (
-                  <span>Pick a date</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={startDateObj}
-                onSelect={(date) => {
-                  if (date) {
-                    onStartDateChange(format(date, "yyyy-MM-dd"));
-                  }
-                }}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </Field>
-
-        <Field>
-          <FieldLabel htmlFor="end-date-picker">End Date</FieldLabel>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                id="end-date-picker"
-                variant="outline"
-                className={cn(
-                  "w-full justify-start text-left font-normal",
-                  !endDateObj && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {endDateObj ? (
-                  format(endDateObj, "PPP")
-                ) : (
-                  <span>Pick a date</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={endDateObj}
-                onSelect={(date) => {
-                  if (date) {
-                    onEndDateChange(format(date, "yyyy-MM-dd"));
-                  }
-                }}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </Field>
-
-        <Field>
-          <FieldLabel htmlFor="update-button" className="sr-only">
-            Update Chart
-          </FieldLabel>
-          <Button id="update-button" onClick={onUpdate} className="w-full">
-            Update Chart
-          </Button>
-        </Field>
       </FieldGroup>
-
-      {/* Quick Date Range Presets */}
-      <Field>
-        <FieldLabel htmlFor="quick-date-range">Quick Date Range</FieldLabel>
-        <div id="quick-date-range" className="flex flex-wrap gap-2">
-          {presets.map((preset) => (
-            <Button
-              key={preset.id}
-              variant={activePreset === preset.id ? "default" : "outline"}
-              size="sm"
-              onClick={() => handlePresetClick(preset.id)}
-            >
-              {preset.label}
-            </Button>
-          ))}
-        </div>
-      </Field>
     </div>
   );
 }

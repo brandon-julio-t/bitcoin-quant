@@ -1,17 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
 import {
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  Legend,
-  Line,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+  CandlestickData,
+  CandlestickSeries,
+  ColorType,
+  createChart,
+  IChartApi,
+  ISeriesApi,
+  LineData,
+  LineSeries,
+  Time,
+} from "lightweight-charts";
+import { useEffect, useRef } from "react";
 
 interface CandlestickChartProps {
   data: Array<{
@@ -41,388 +41,253 @@ interface CandlestickChartProps {
   priceMax: number;
 }
 
-interface CandlestickShapeProps {
-  x: number;
-  y: number;
-  width: number;
-  payload: {
-    open: number;
-    high: number;
-    low: number;
-    close: number;
-    isHalving?: boolean;
-    isTopSignal?: boolean;
-    isBottomSignal?: boolean;
-    halvingLabel?: string;
-    topSignalLabel?: string;
-    bottomSignalLabel?: string;
-  };
-  yAxis?: {
-    scale: (value: number) => number;
-  };
-  yDomain?: [number, number];
-  height?: number;
-  margin?: {
-    top: number;
-    right: number;
-    left: number;
-    bottom: number;
-  };
-}
-
-// Custom candlestick shape for Bar component
-const CandlestickShape = (props: CandlestickShapeProps) => {
-  const { x, y, width, payload } = props;
-  const {
-    open,
-    high,
-    low,
-    close,
-    isHalving,
-    isTopSignal,
-    isBottomSignal,
-    halvingLabel,
-    topSignalLabel,
-    bottomSignalLabel,
-  } = payload;
-  const isPositive = close >= open;
-
-  // Get the Y-axis scale and domain from props
-  const yAxis = props.yAxis;
-  const yDomain = props.yDomain || [0, 100];
-  const chartHeight = props.height || 600;
-  const margin = props.margin || { top: 20, right: 30, left: 60, bottom: 20 };
-
-  // Calculate positions
-  let highY: number, lowY: number, bodyTopY: number, bodyBottomY: number;
-
-  if (yAxis && typeof yAxis.scale === "function") {
-    // Use the scale if available (most accurate)
-    const scale = yAxis.scale;
-    highY = scale(high);
-    lowY = scale(low);
-    const bodyTop = Math.max(open, close);
-    const bodyBottom = Math.min(open, close);
-    bodyTopY = scale(bodyTop);
-    bodyBottomY = scale(bodyBottom);
-  } else {
-    // Fallback: use the `y` prop as reference (it represents the Y position of `high`)
-    // and calculate other positions relative to it
-    const [minPrice, maxPrice] = yDomain;
-    const priceRange = maxPrice - minPrice;
-    const plotHeight = chartHeight - margin.top - margin.bottom;
-
-    // The `y` prop from Bar component represents the Y position of the `high` value
-    // Use it directly as our reference point
-    highY = y;
-
-    // Calculate price differences (in price units)
-    const priceDiffHighLow = high - low;
-    const bodyTop = Math.max(open, close);
-    const bodyBottom = Math.min(open, close);
-    const priceDiffHighBodyTop = high - bodyTop;
-    const priceDiffHighBodyBottom = high - bodyBottom;
-
-    // Convert price differences to pixel differences
-    // In SVG, Y increases downward, so lower prices = higher Y values
-    const pixelPerPrice = plotHeight / priceRange;
-
-    lowY = highY + priceDiffHighLow * pixelPerPrice;
-    bodyTopY = highY + priceDiffHighBodyTop * pixelPerPrice;
-    bodyBottomY = highY + priceDiffHighBodyBottom * pixelPerPrice;
-  }
-
-  const wickColor = isPositive ? "#26a69a" : "#ef5350";
-  const bodyColor = isPositive ? "#26a69a" : "#ef5350";
-
-  // Calculate the center of the bar (x is the left edge, so center is x + width/2)
-  const barCenterX = x + width / 2;
-  const candleWidth = Math.max(width * 0.6, 4);
-  const candleX = barCenterX - candleWidth / 2;
-  const bodyHeight = Math.abs(bodyBottomY - bodyTopY);
-
-  // Calculate the full chart height for vertical lines
-  // Stop at the x-axis, which is at the bottom of the plot area
-  const plotAreaTop = margin.top;
-  const plotAreaBottom = chartHeight - margin.bottom;
-  // The x-axis has a height of 80px (from XAxis height prop)
-  // Stop the line just above the x-axis line (add small buffer for the axis line itself)
-  const xAxisY = plotAreaBottom - 80 + 5;
-
-  // Determine signal line properties
-  let signalStroke: string | null = null;
-  let signalDashArray: string | undefined = undefined;
-  let signalLabel: string | undefined = undefined;
-
-  if (isHalving) {
-    signalStroke = "rgba(255, 255, 0, 0.5)";
-    signalDashArray = "5 5";
-    signalLabel = halvingLabel;
-  } else if (isTopSignal) {
-    signalStroke = "rgba(255, 0, 0, 0.5)";
-    signalDashArray = "10 5";
-    signalLabel = topSignalLabel;
-  } else if (isBottomSignal) {
-    signalStroke = "rgba(0, 255, 0, 0.5)";
-    signalDashArray = "10 5";
-    signalLabel = bottomSignalLabel;
-  }
-
-  return (
-    <g>
-      {/* Vertical reference line - drawn first so it's behind the candlestick */}
-      {signalStroke && (
-        <>
-          <line
-            x1={barCenterX}
-            y1={plotAreaTop}
-            x2={barCenterX}
-            y2={xAxisY}
-            stroke={signalStroke}
-            strokeWidth={1}
-            strokeDasharray={signalDashArray}
-          />
-          {/* Label at the top */}
-          {signalLabel && (
-            <text
-              x={barCenterX}
-              y={plotAreaTop - 8}
-              fill={signalStroke}
-              fontSize={11}
-              textAnchor="middle"
-            >
-              {signalLabel}
-            </text>
-          )}
-        </>
-      )}
-      {/* Wick (high-low line) */}
-      <line
-        x1={barCenterX}
-        y1={highY}
-        x2={barCenterX}
-        y2={lowY}
-        stroke={wickColor}
-        strokeWidth={1.5}
-      />
-      {/* Body (open-close rectangle) */}
-      <rect
-        x={candleX}
-        y={bodyTopY}
-        width={candleWidth}
-        height={Math.max(bodyHeight, 1)}
-        fill={bodyColor}
-        stroke={bodyColor}
-        strokeWidth={1}
-      />
-    </g>
-  );
-};
-
+/**
+ * CandlestickChart component using TradingView Lightweight Charts
+ * Displays candlestick data with EMAs, Bollinger Bands, and signal markers
+ */
 export default function CandlestickChart({
   data,
   priceMin,
   priceMax,
 }: CandlestickChartProps) {
-  // Transform data for chart rendering
-  const candlestickData = useMemo(() => {
-    return data.map((d) => ({
-      ...d,
-    }));
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const ema13SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const ema21SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const ema50SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const ema100SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const bbUpperSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const bbMiddleSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const bbLowerSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
+
+    // Create chart instance
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: "transparent" },
+        textColor: "#ffffff",
+      },
+      grid: {
+        vertLines: { color: "rgba(255, 255, 255, 0.1)" },
+        horzLines: { color: "rgba(255, 255, 255, 0.1)" },
+      },
+      width: chartContainerRef.current.clientWidth,
+      height: 600,
+      rightPriceScale: {
+        borderColor: "#ffffff",
+        scaleMargins: {
+          top: 0.1,
+          bottom: 0.1,
+        },
+      },
+      timeScale: {
+        borderColor: "#ffffff",
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      crosshair: {
+        mode: 1, // Normal mode
+      },
+    });
+
+    chartRef.current = chart;
+
+    // Create candlestick series
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
+      upColor: "#26a69a",
+      downColor: "#ef5350",
+      borderVisible: false,
+      wickUpColor: "#26a69a",
+      wickDownColor: "#ef5350",
+      priceFormat: {
+        type: "price",
+        precision: 2,
+        minMove: 0.01,
+      },
+    });
+    candlestickSeriesRef.current = candlestickSeries;
+
+    // Create EMA series
+    const ema13Series = chart.addSeries(LineSeries, {
+      color: "rgba(33, 150, 243, 1)",
+      lineWidth: 2,
+      title: "EMA 13",
+      priceFormat: {
+        type: "price",
+        precision: 2,
+        minMove: 0.01,
+      },
+    });
+    ema13SeriesRef.current = ema13Series;
+
+    const ema21Series = chart.addSeries(LineSeries, {
+      color: "rgba(255, 152, 0, 1)",
+      lineWidth: 2,
+      title: "EMA 21",
+      priceFormat: {
+        type: "price",
+        precision: 2,
+        minMove: 0.01,
+      },
+    });
+    ema21SeriesRef.current = ema21Series;
+
+    const ema50Series = chart.addSeries(LineSeries, {
+      color: "rgba(156, 39, 176, 1)",
+      lineWidth: 2,
+      title: "EMA 50",
+      priceFormat: {
+        type: "price",
+        precision: 2,
+        minMove: 0.01,
+      },
+    });
+    ema50SeriesRef.current = ema50Series;
+
+    const ema100Series = chart.addSeries(LineSeries, {
+      color: "rgba(255, 193, 7, 1)",
+      lineWidth: 2,
+      title: "EMA 100",
+      priceFormat: {
+        type: "price",
+        precision: 2,
+        minMove: 0.01,
+      },
+    });
+    ema100SeriesRef.current = ema100Series;
+
+    // Create Bollinger Bands series
+    const bbUpperSeries = chart.addSeries(LineSeries, {
+      color: "rgba(250, 250, 250, 0.3)",
+      lineWidth: 1,
+      title: "BB Upper",
+      priceFormat: {
+        type: "price",
+        precision: 2,
+        minMove: 0.01,
+      },
+    });
+    bbUpperSeriesRef.current = bbUpperSeries;
+
+    const bbMiddleSeries = chart.addSeries(LineSeries, {
+      color: "rgba(250, 250, 250, 0.5)",
+      lineWidth: 1,
+      lineStyle: 1, // Dashed line
+      title: "BB Middle",
+      priceFormat: {
+        type: "price",
+        precision: 2,
+        minMove: 0.01,
+      },
+    });
+    bbMiddleSeriesRef.current = bbMiddleSeries;
+
+    const bbLowerSeries = chart.addSeries(LineSeries, {
+      color: "rgba(250, 250, 250, 0.3)",
+      lineWidth: 1,
+      title: "BB Lower",
+      priceFormat: {
+        type: "price",
+        precision: 2,
+        minMove: 0.01,
+      },
+    });
+    bbLowerSeriesRef.current = bbLowerSeries;
+
+    // Handle resize
+    const handleResize = () => {
+      if (chartContainerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({
+          width: chartContainerRef.current.clientWidth,
+        });
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    // Cleanup function
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update chart data when data prop changes
+  useEffect(() => {
+    if (!data.length || !chartRef.current) return;
+
+    // Convert data to TradingView format
+    const candlestickData: CandlestickData<Time>[] = [];
+    const ema13Data: LineData<Time>[] = [];
+    const ema21Data: LineData<Time>[] = [];
+    const ema50Data: LineData<Time>[] = [];
+    const ema100Data: LineData<Time>[] = [];
+    const bbUpperData: LineData<Time>[] = [];
+    const bbMiddleData: LineData<Time>[] = [];
+    const bbLowerData: LineData<Time>[] = [];
+
+    data.forEach((point) => {
+      // Convert date string to timestamp (seconds)
+      const timestamp = Math.floor(
+        new Date(point.date).getTime() / 1000
+      ) as Time;
+
+      candlestickData.push({
+        time: timestamp,
+        open: point.open,
+        high: point.high,
+        low: point.low,
+        close: point.close,
+      });
+
+      if (point.ema13 !== null) {
+        ema13Data.push({ time: timestamp, value: point.ema13 });
+      }
+      if (point.ema21 !== null) {
+        ema21Data.push({ time: timestamp, value: point.ema21 });
+      }
+      if (point.ema50 !== null) {
+        ema50Data.push({ time: timestamp, value: point.ema50 });
+      }
+      if (point.ema100 !== null) {
+        ema100Data.push({ time: timestamp, value: point.ema100 });
+      }
+      if (point.bbUpper !== null) {
+        bbUpperData.push({ time: timestamp, value: point.bbUpper });
+      }
+      if (point.bbMiddle !== null) {
+        bbMiddleData.push({ time: timestamp, value: point.bbMiddle });
+      }
+      if (point.bbLower !== null) {
+        bbLowerData.push({ time: timestamp, value: point.bbLower });
+      }
+    });
+
+    // Set data to series
+    candlestickSeriesRef.current?.setData(candlestickData);
+    ema13SeriesRef.current?.setData(ema13Data);
+    ema21SeriesRef.current?.setData(ema21Data);
+    ema50SeriesRef.current?.setData(ema50Data);
+    ema100SeriesRef.current?.setData(ema100Data);
+    bbUpperSeriesRef.current?.setData(bbUpperData);
+    bbMiddleSeriesRef.current?.setData(bbMiddleData);
+    bbLowerSeriesRef.current?.setData(bbLowerData);
+
+    // Fit content
+    chartRef.current.timeScale().fitContent();
   }, [data]);
 
   return (
-    <ResponsiveContainer width="100%" height={600}>
-      <ComposedChart
-        data={candlestickData}
-        margin={{ top: 20, right: 30, left: 60, bottom: 20 }}
-      >
-        <CartesianGrid
-          strokeDasharray="3 3"
-          stroke="rgba(255, 255, 255, 0.1)"
-        />
-        <XAxis
-          dataKey="dateLabel"
-          stroke="#ffffff"
-          tick={{ fill: "#ffffff" }}
-          angle={-45}
-          textAnchor="end"
-          height={80}
-          type="category"
-          allowDuplicatedCategory={false}
-        />
-        <YAxis
-          domain={[priceMin * 0.95, priceMax * 1.05]}
-          stroke="#ffffff"
-          tick={{ fill: "#ffffff" }}
-          tickFormatter={(value) => (value > 0 ? value.toLocaleString() : "")}
-          width={80}
-        />
-        <Tooltip
-          contentStyle={{
-            backgroundColor: "#1f2937",
-            border: "1px solid #374151",
-            color: "#ffffff",
-          }}
-          labelStyle={{ color: "#9ca3af" }}
-          formatter={(value: number | string, name: string) => {
-            if (
-              name === "candleHigh" ||
-              name === "candleLow" ||
-              name === "candleBody"
-            )
-              return null;
-            return typeof value === "number"
-              ? [
-                  value.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  }),
-                  name,
-                ]
-              : [value, name];
-          }}
-          content={(props) => {
-            if (!props?.active || !props.payload) return null;
-            const data = props.payload[0]?.payload as
-              | (typeof candlestickData)[0]
-              | undefined;
-            if (!data) return null;
-            return (
-              <div
-                style={{
-                  backgroundColor: "#1f2937",
-                  border: "1px solid #374151",
-                  padding: "8px",
-                  borderRadius: "4px",
-                }}
-              >
-                <p style={{ color: "#9ca3af", margin: 0, fontSize: "12px" }}>
-                  {data.dateLabel}
-                </p>
-                <p style={{ color: "#ffffff", margin: "4px 0 0 0" }}>
-                  O: $
-                  {data.open.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-                <p style={{ color: "#ffffff", margin: "2px 0" }}>
-                  H: $
-                  {data.high.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-                <p style={{ color: "#ffffff", margin: "2px 0" }}>
-                  L: $
-                  {data.low.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-                <p style={{ color: "#ffffff", margin: "2px 0 0 0" }}>
-                  C: $
-                  {data.close.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-              </div>
-            );
-          }}
-        />
-        <Legend
-          wrapperStyle={{ color: "#ffffff" }}
-          iconType="line"
-          formatter={(value) => (
-            <span style={{ color: "#ffffff" }}>{value}</span>
-          )}
-        />
-
-        {/* Bollinger Bands */}
-        <Line
-          type="monotone"
-          dataKey="bbUpper"
-          stroke="rgba(250, 250, 250, 0.3)"
-          strokeWidth={1}
-          dot={false}
-          name="BB Upper"
-          connectNulls
-        />
-        <Line
-          type="monotone"
-          dataKey="bbMiddle"
-          stroke="rgba(250, 250, 250, 0.5)"
-          strokeWidth={1}
-          strokeDasharray="5 5"
-          dot={false}
-          name="BB Middle"
-          connectNulls
-        />
-        <Line
-          type="monotone"
-          dataKey="bbLower"
-          stroke="rgba(250, 250, 250, 0.3)"
-          strokeWidth={1}
-          dot={false}
-          name="BB Lower"
-          connectNulls
-        />
-
-        {/* Candlesticks */}
-        <Bar
-          dataKey="high"
-          shape={(props: unknown) => (
-            <CandlestickShape
-              {...(props as CandlestickShapeProps)}
-              yDomain={[priceMin * 0.95, priceMax * 1.05]}
-              height={600}
-              margin={{ top: 20, right: 30, left: 60, bottom: 20 }}
-            />
-          )}
-          name="BTC-USD"
-          isAnimationActive={false}
-        />
-
-        {/* EMAs */}
-        <Line
-          type="monotone"
-          dataKey="ema13"
-          stroke="rgba(33, 150, 243, 1)"
-          strokeWidth={1.5}
-          dot={false}
-          name="EMA 13"
-          connectNulls
-        />
-        <Line
-          type="monotone"
-          dataKey="ema21"
-          stroke="rgba(255, 152, 0, 1)"
-          strokeWidth={1.5}
-          dot={false}
-          name="EMA 21"
-          connectNulls
-        />
-        <Line
-          type="monotone"
-          dataKey="ema50"
-          stroke="rgba(156, 39, 176, 1)"
-          strokeWidth={1.5}
-          dot={false}
-          name="EMA 50"
-          connectNulls
-        />
-        <Line
-          type="monotone"
-          dataKey="ema100"
-          stroke="rgba(255, 193, 7, 1)"
-          strokeWidth={1.5}
-          dot={false}
-          name="EMA 100"
-          connectNulls
-        />
-      </ComposedChart>
-    </ResponsiveContainer>
+    <div
+      ref={chartContainerRef}
+      className="w-full"
+      style={{ height: "600px" }}
+    />
   );
 }

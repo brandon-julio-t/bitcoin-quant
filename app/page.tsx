@@ -12,18 +12,21 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { calculateAllIndicators, OHLCV } from "@/lib/indicators";
 import { useQuery } from "@tanstack/react-query";
-import { format, subYears } from "date-fns";
+import { format } from "date-fns";
 import { useMemo, useState } from "react";
 
-async function fetchBitcoinData(
-  timeframe: string,
-  startDate: string,
-  endDate: string
-): Promise<OHLCV[]> {
+/**
+ * Bitcoin genesis block date: January 3, 2009
+ * This is when Bitcoin was created
+ */
+const BITCOIN_BIRTH_DATE = "2009-01-03";
+
+async function fetchBitcoinData(timeframe: string): Promise<OHLCV[]> {
+  const now = format(new Date(), "yyyy-MM-dd");
   const params = new URLSearchParams({
     interval: timeframe,
-    startDate,
-    endDate,
+    startDate: BITCOIN_BIRTH_DATE,
+    endDate: now,
   });
 
   const response = await fetch(`/api/bitcoin?${params}`);
@@ -33,7 +36,7 @@ async function fetchBitcoinData(
 
   const bitcoinData: OHLCV[] = await response.json();
   if (bitcoinData.length === 0) {
-    throw new Error("No data available for the selected date range");
+    throw new Error("No data available");
   }
 
   return bitcoinData;
@@ -41,20 +44,14 @@ async function fetchBitcoinData(
 
 export default function Home() {
   const [timeframe, setTimeframe] = useState("1m");
-  const [startDate, setStartDate] = useState(
-    format(subYears(new Date(), 10), "yyyy-MM-dd")
-  );
-  const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [activePreset, setActivePreset] = useState("10y");
 
   const {
     data: bitcoinData,
     isLoading,
     error,
-    refetch,
   } = useQuery({
-    queryKey: ["bitcoin", timeframe, startDate, endDate],
-    queryFn: () => fetchBitcoinData(timeframe, startDate, endDate),
+    queryKey: ["bitcoin", timeframe],
+    queryFn: () => fetchBitcoinData(timeframe),
     staleTime: 1000 * 60 * 5, // 5 minutes - data stays fresh for 5 minutes
   });
 
@@ -63,10 +60,6 @@ export default function Home() {
     return calculateAllIndicators(bitcoinData);
   }, [bitcoinData]);
 
-  const handleUpdate = () => {
-    refetch();
-  };
-
   return (
     <main className="min-h-screen bg-background text-foreground p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -74,17 +67,7 @@ export default function Home() {
           Bitcoin Quant Indicators
         </h1>
 
-        <ChartControls
-          timeframe={timeframe}
-          startDate={startDate}
-          endDate={endDate}
-          activePreset={activePreset}
-          onTimeframeChange={setTimeframe}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
-          onPresetClick={setActivePreset}
-          onUpdate={handleUpdate}
-        />
+        <ChartControls timeframe={timeframe} onTimeframeChange={setTimeframe} />
 
         {isLoading && (
           <Empty className="border">
