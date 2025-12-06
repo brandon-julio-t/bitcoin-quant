@@ -33,6 +33,8 @@ interface CandlestickChartProps {
     bbUpper: number | null;
     bbMiddle: number | null;
     bbLower: number | null;
+    stochasticK?: number | null;
+    stochasticD?: number | null;
     // Signal flags
     isHalving?: boolean;
     isTopSignal?: boolean;
@@ -65,16 +67,25 @@ export default function CandlestickChart({
   const bbUpperSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const bbMiddleSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const bbLowerSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const stochasticKSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const stochasticDSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const stochasticOverboughtLineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const stochasticOversoldLineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const [isLogarithmic, setIsLogarithmic] = useState(false);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    // Create chart instance
+    // Create chart instance with panes configuration
     const chart = createChart(chartContainerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: "#ffffff",
+        panes: {
+          separatorColor: "rgba(255, 255, 255, 0.2)",
+          separatorHoverColor: "rgba(255, 255, 255, 0.4)",
+          enableResize: true,
+        },
       },
       grid: {
         vertLines: { color: "rgba(255, 255, 255, 0.1)" },
@@ -236,6 +247,93 @@ export default function CandlestickChart({
     });
     bbLowerSeriesRef.current = bbLowerSeries;
 
+    // Create Stochastic Oscillator series in pane 1
+    // Overbought line (80)
+    const stochasticOverboughtLine = chart.addSeries(
+      LineSeries,
+      {
+        color: "#ef5350",
+        lineWidth: 1,
+        lineStyle: 1, // Dashed
+        title: "",
+        priceFormat: {
+          type: "price",
+          precision: 0,
+          minMove: 1,
+        },
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      1 // Pane index 1
+    );
+    stochasticOverboughtLineRef.current = stochasticOverboughtLine;
+
+    // Oversold line (20)
+    const stochasticOversoldLine = chart.addSeries(
+      LineSeries,
+      {
+        color: "#26a69a",
+        lineWidth: 1,
+        lineStyle: 1, // Dashed
+        title: "",
+        priceFormat: {
+          type: "price",
+          precision: 0,
+          minMove: 1,
+        },
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      1 // Pane index 1
+    );
+    stochasticOversoldLineRef.current = stochasticOversoldLine;
+
+    // Stochastic %K line
+    const stochasticKSeries = chart.addSeries(
+      LineSeries,
+      {
+        color: "rgba(33, 150, 243, 1)",
+        lineWidth: 1,
+        title: "",
+        priceFormat: {
+          type: "price",
+          precision: 2,
+          minMove: 0.01,
+        },
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      1 // Pane index 1
+    );
+    stochasticKSeriesRef.current = stochasticKSeries;
+
+    // Stochastic %D line
+    const stochasticDSeries = chart.addSeries(
+      LineSeries,
+      {
+        color: "rgba(255, 152, 0, 1)",
+        lineWidth: 1,
+        title: "",
+        priceFormat: {
+          type: "price",
+          precision: 2,
+          minMove: 0.01,
+        },
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      1 // Pane index 1
+    );
+    stochasticDSeriesRef.current = stochasticDSeries;
+
+    // Configure stochastic pane height
+    // Note: Price scale for pane 1 will be auto-configured based on the series data
+    // The stochastic series will automatically use the right price scale of pane 1
+    const stochasticPane = chart.panes()[1];
+    if (stochasticPane) {
+      stochasticPane.setHeight(200);
+    }
+
     // Handle resize
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
@@ -270,6 +368,10 @@ export default function CandlestickChart({
     const bbUpperData: LineData<Time>[] = [];
     const bbMiddleData: LineData<Time>[] = [];
     const bbLowerData: LineData<Time>[] = [];
+    const stochasticKData: LineData<Time>[] = [];
+    const stochasticDData: LineData<Time>[] = [];
+    const stochasticOverboughtData: LineData<Time>[] = [];
+    const stochasticOversoldData: LineData<Time>[] = [];
 
     // Minimum value for logarithmic scale to avoid log(0) or log(negative) issues
     const MIN_LOG_VALUE = 0.01;
@@ -325,6 +427,18 @@ export default function CandlestickChart({
           bbLowerData.push({ time: timestamp, value: point.bbLower });
         }
       }
+
+      // Stochastic oscillator data
+      if (point.stochasticK !== null && point.stochasticK !== undefined) {
+        stochasticKData.push({ time: timestamp, value: point.stochasticK });
+      }
+      if (point.stochasticD !== null && point.stochasticD !== undefined) {
+        stochasticDData.push({ time: timestamp, value: point.stochasticD });
+      }
+
+      // Stochastic reference lines (80 and 20)
+      stochasticOverboughtData.push({ time: timestamp, value: 80 });
+      stochasticOversoldData.push({ time: timestamp, value: 20 });
     });
 
     // Set data to series
@@ -336,6 +450,27 @@ export default function CandlestickChart({
     bbUpperSeriesRef.current?.setData(bbUpperData);
     bbMiddleSeriesRef.current?.setData(bbMiddleData);
     bbLowerSeriesRef.current?.setData(bbLowerData);
+    stochasticKSeriesRef.current?.setData(stochasticKData);
+    stochasticDSeriesRef.current?.setData(stochasticDData);
+    stochasticOverboughtLineRef.current?.setData(stochasticOverboughtData);
+    stochasticOversoldLineRef.current?.setData(stochasticOversoldData);
+
+    // Configure price scale for stochastic pane (pane 1) after data is set
+    // The price scale will auto-scale based on the stochastic data (0-100 range)
+    if (chartRef.current && chartRef.current.panes().length > 1) {
+      try {
+        // Access the price scale for pane 1's right price scale
+        // Note: Each pane has its own price scales
+        const stochasticPane = chartRef.current.panes()[1];
+        if (stochasticPane) {
+          // The price scale is automatically configured when series are added to a pane
+          // Auto-scaling is enabled by default, which will fit the 0-100 range
+        }
+      } catch (error) {
+        // Price scale configuration is optional - auto-scaling will handle it
+        console.debug("Price scale configuration for stochastic pane:", error);
+      }
+    }
 
     // Add markers for halving dates and signals
     type ChartMarker = {
