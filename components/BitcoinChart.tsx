@@ -163,7 +163,7 @@ export default function BitcoinChart({ data, indicators }: BitcoinChartProps) {
       {/* Main Price Chart */}
       <div className="bg-card rounded-lg p-4 border">
         <h2 className="text-xl font-bold text-card-foreground mb-4 text-center">
-          Bitcoin (BTC-USD) - TradingView Style Chart
+          Bitcoin (BTC-USD)
         </h2>
         <CandlestickChart
           data={chartData}
