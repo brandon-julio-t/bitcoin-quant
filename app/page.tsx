@@ -123,7 +123,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-background text-foreground p-4 md:p-8">
-      <div className="container px-4 mx-auto">
+      <div className="container mx-auto">
         <h1 className="text-3xl md:text-4xl font-bold text-center mb-8">
           Bitcoin Quant Indicators
         </h1>
