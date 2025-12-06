@@ -450,13 +450,9 @@ export default function CandlestickChart({
 
     // Configure all pane heights after series creation
     const panes = chart.panes();
-    // if (panes.length >= 3) {
-    //   // Pane 1 is stochastic
     panes[0].setHeight(PANE_HEIGHTS.main);
-    // panes[1].setHeight(PANE_HEIGHTS.stochastic);
-    //   // Pane 2 is fear and greed
-    // panes[2].setHeight(PANE_HEIGHTS.fearGreed);
-    // }
+    panes[1].setHeight(PANE_HEIGHTS.stochastic);
+    panes[2].setHeight(PANE_HEIGHTS.fearGreed);
 
     // Handle resize
     const handleResize = () => {
