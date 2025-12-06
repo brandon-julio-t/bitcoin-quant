@@ -128,48 +128,56 @@ export default function CandlestickChart({
     const ema13Series = chart.addSeries(LineSeries, {
       color: "rgba(33, 150, 243, 1)",
       lineWidth: 2,
-      title: "EMA 13",
+      title: "",
       priceFormat: {
         type: "price",
         precision: 2,
         minMove: 0.01,
       },
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
     ema13SeriesRef.current = ema13Series;
 
     const ema21Series = chart.addSeries(LineSeries, {
       color: "rgba(255, 152, 0, 1)",
       lineWidth: 2,
-      title: "EMA 21",
+      title: "",
       priceFormat: {
         type: "price",
         precision: 2,
         minMove: 0.01,
       },
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
     ema21SeriesRef.current = ema21Series;
 
     const ema50Series = chart.addSeries(LineSeries, {
       color: "rgba(156, 39, 176, 1)",
       lineWidth: 2,
-      title: "EMA 50",
+      title: "",
       priceFormat: {
         type: "price",
         precision: 2,
         minMove: 0.01,
       },
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
     ema50SeriesRef.current = ema50Series;
 
     const ema100Series = chart.addSeries(LineSeries, {
       color: "rgba(255, 193, 7, 1)",
       lineWidth: 2,
-      title: "EMA 100",
+      title: "",
       priceFormat: {
         type: "price",
         precision: 2,
         minMove: 0.01,
       },
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
     ema100SeriesRef.current = ema100Series;
 
@@ -177,12 +185,14 @@ export default function CandlestickChart({
     const bbUpperSeries = chart.addSeries(LineSeries, {
       color: "rgba(250, 250, 250, 0.3)",
       lineWidth: 1,
-      title: "BB Upper",
+      title: "",
       priceFormat: {
         type: "price",
         precision: 2,
         minMove: 0.01,
       },
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
     bbUpperSeriesRef.current = bbUpperSeries;
 
@@ -190,24 +200,28 @@ export default function CandlestickChart({
       color: "rgba(250, 250, 250, 0.5)",
       lineWidth: 1,
       lineStyle: 1, // Dashed line
-      title: "BB Middle",
+      title: "",
       priceFormat: {
         type: "price",
         precision: 2,
         minMove: 0.01,
       },
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
     bbMiddleSeriesRef.current = bbMiddleSeries;
 
     const bbLowerSeries = chart.addSeries(LineSeries, {
       color: "rgba(250, 250, 250, 0.3)",
       lineWidth: 1,
-      title: "BB Lower",
+      title: "",
       priceFormat: {
         type: "price",
         precision: 2,
         minMove: 0.01,
       },
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
     bbLowerSeriesRef.current = bbLowerSeries;
 

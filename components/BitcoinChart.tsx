@@ -122,11 +122,14 @@ function StochasticChart({
       color: "#ef5350",
       lineWidth: 1,
       lineStyle: 1, // Dashed
+      title: "",
       priceFormat: {
         type: "price",
         precision: 0,
         minMove: 1,
       },
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
     overboughtLineRef.current = overboughtLine;
 
@@ -134,11 +137,14 @@ function StochasticChart({
       color: "#26a69a",
       lineWidth: 1,
       lineStyle: 1, // Dashed
+      title: "",
       priceFormat: {
         type: "price",
         precision: 0,
         minMove: 1,
       },
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
     oversoldLineRef.current = oversoldLine;
 
@@ -146,12 +152,14 @@ function StochasticChart({
     const kSeries = chart.addSeries(LineSeries, {
       color: "rgba(33, 150, 243, 1)",
       lineWidth: 1,
-      title: "%K",
+      title: "",
       priceFormat: {
         type: "price",
         precision: 2,
         minMove: 0.01,
       },
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
     kSeriesRef.current = kSeries;
 
@@ -167,12 +175,14 @@ function StochasticChart({
     const dSeries = chart.addSeries(LineSeries, {
       color: "rgba(255, 152, 0, 1)",
       lineWidth: 1,
-      title: "%D",
+      title: "",
       priceFormat: {
         type: "price",
         precision: 2,
         minMove: 0.01,
       },
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
     dSeriesRef.current = dSeries;
 
