@@ -6,6 +6,7 @@ import {
   CandlestickSeries,
   ColorType,
   createChart,
+  createSeriesMarkers,
   IChartApi,
   ISeriesApi,
   LineData,
@@ -55,6 +56,8 @@ export default function CandlestickChart({
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const markersRef = useRef<any>(null);
   const ema13SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const ema21SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const ema50SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
@@ -123,6 +126,10 @@ export default function CandlestickChart({
       },
     });
     candlestickSeriesRef.current = candlestickSeries;
+
+    // Create markers instance for the candlestick series
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    markersRef.current = createSeriesMarkers(candlestickSeries as any, []);
 
     // Notify parent component that series is ready
     if (onSeriesReady) {
@@ -330,6 +337,78 @@ export default function CandlestickChart({
     bbUpperSeriesRef.current?.setData(bbUpperData);
     bbMiddleSeriesRef.current?.setData(bbMiddleData);
     bbLowerSeriesRef.current?.setData(bbLowerData);
+
+    // Add markers for halving dates and signals
+    type ChartMarker = {
+      time: Time;
+      position: "aboveBar" | "belowBar";
+      color: string;
+      shape: "arrowDown" | "arrowUp" | "circle";
+      size: number;
+      text: string;
+    };
+    const markers: ChartMarker[] = [];
+    data.forEach((point) => {
+      const timestamp = Math.floor(
+        new Date(point.date).getTime() / 1000
+      ) as Time;
+
+      if (point.isHalving) {
+        markers.push({
+          time: timestamp,
+          position: "belowBar",
+          color: "#f59e0b",
+          shape: "circle",
+          size: 2,
+          text: point.halvingLabel || "Halving",
+        });
+      }
+
+      if (point.isTopSignal) {
+        markers.push({
+          time: timestamp,
+          position: "aboveBar",
+          color: "#10b981",
+          shape: "arrowDown",
+          size: 2,
+          text: point.topSignalLabel || "Top Signal",
+        });
+      }
+
+      if (point.isBottomSignal) {
+        markers.push({
+          time: timestamp,
+          position: "belowBar",
+          color: "#ef4444",
+          shape: "arrowUp",
+          size: 2,
+          text: point.bottomSignalLabel || "Bottom Signal",
+        });
+      }
+    });
+
+    // Set markers on candlestick series using the markers instance
+    // Markers must be sorted by time
+    if (markersRef.current) {
+      if (markers.length > 0) {
+        // Sort markers by time to ensure proper rendering
+        markers.sort((a, b) => {
+          const timeA =
+            typeof a.time === "number"
+              ? a.time
+              : new Date(a.time as string).getTime() / 1000;
+          const timeB =
+            typeof b.time === "number"
+              ? b.time
+              : new Date(b.time as string).getTime() / 1000;
+          return timeA - timeB;
+        });
+        markersRef.current.setMarkers(markers);
+      } else {
+        // Clear markers if there are none
+        markersRef.current.setMarkers([]);
+      }
+    }
 
     // Fit content
     chartRef.current.timeScale().fitContent();

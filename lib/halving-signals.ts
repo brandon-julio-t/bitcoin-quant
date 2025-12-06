@@ -24,14 +24,14 @@ export function getBitcoinHalvingSignals(): HalvingSignals {
   const bottomSignals: Date[] = [];
 
   halvingDates.forEach((halvingDate) => {
-    // Top signal: 518 days (17 months) after halving
+    // Top signal: 17 months since halving month (~518 days)
     const topSignal = new Date(halvingDate);
-    topSignal.setDate(topSignal.getDate() + 518);
+    topSignal.setMonth(topSignal.getMonth() + 17);
     topSignals.push(topSignal);
 
-    // Bottom signal: 883 days (29 months) after halving
+    // Bottom signal: 29 months since halving month (~883 days)
     const bottomSignal = new Date(halvingDate);
-    bottomSignal.setDate(bottomSignal.getDate() + 883);
+    bottomSignal.setMonth(bottomSignal.getMonth() + 29);
     bottomSignals.push(bottomSignal);
   });
 
