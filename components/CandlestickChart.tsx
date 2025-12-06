@@ -253,7 +253,7 @@ export default function CandlestickChart({
           domain={[priceMin * 0.95, priceMax * 1.05]}
           stroke="#ffffff"
           tick={{ fill: "#ffffff" }}
-          tickFormatter={(value) => value.toLocaleString()}
+          tickFormatter={(value) => (value > 0 ? value.toLocaleString() : "")}
           width={80}
         />
         <Tooltip
