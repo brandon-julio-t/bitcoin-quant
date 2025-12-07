@@ -11,6 +11,45 @@ export interface OHLCV {
   volume: number;
 }
 
+export type OrderBlockType = "buy" | "sell";
+
+export interface OrderBlockZone {
+  type: OrderBlockType;
+  /**
+   * Index of the source candle that defines the zone.
+   */
+  startIndex: number;
+  /**
+   * Index of the candle that invalidates the zone (or the last candle if still valid).
+   */
+  endIndex: number;
+  startTime: string;
+  endTime: string;
+  low: number;
+  high: number;
+}
+
+interface OrderBlockSettings {
+  /**
+   * Number of candles on each side required to confirm a swing high/low.
+   */
+  swingLookback: number;
+  /**
+   * Minimum percentage break of the prior swing to confirm structure shift.
+   */
+  minimumBreakoutPercent: number;
+  /**
+   * Maximum bars to look back from a break to find the last opposite candle.
+   */
+  maxSourceLookback: number;
+}
+
+const DEFAULT_ORDER_BLOCK_SETTINGS: OrderBlockSettings = {
+  swingLookback: 3,
+  minimumBreakoutPercent: 0.0015, // 0.15%
+  maxSourceLookback: 15,
+};
+
 /**
  * Calculate Exponential Moving Average
  */
@@ -139,6 +178,154 @@ export function calculateStochastic(
 }
 
 /**
+ * Detect buy/sell order blocks using a simplified LuxAlgo-style BOS approach.
+ *
+ * The logic:
+ * - Identify swing highs/lows using a symmetric lookback window.
+ * - Confirm a break of structure (BOS) once price closes beyond the prior swing
+ *   by at least `minimumBreakoutPercent`.
+ * - Mark the last opposite candle before the BOS as the order block origin.
+ * - Extend the zone forward until an invalidation close pierces the extreme.
+ */
+export function calculateOrderBlocks(
+  data: OHLCV[],
+  settings: OrderBlockSettings = DEFAULT_ORDER_BLOCK_SETTINGS
+): OrderBlockZone[] {
+  if (!data.length) {
+    return [];
+  }
+
+  const zones: OrderBlockZone[] = [];
+  const { swingLookback, minimumBreakoutPercent, maxSourceLookback } = settings;
+
+  const isSwingHigh = (index: number) => {
+    if (index < swingLookback || index > data.length - swingLookback - 1) {
+      return false;
+    }
+    const window = data.slice(index - swingLookback, index + swingLookback + 1);
+    const targetHigh = data[index].high;
+    return window.every(
+      (bar, idx) => idx === swingLookback || targetHigh >= bar.high
+    );
+  };
+
+  const isSwingLow = (index: number) => {
+    if (index < swingLookback || index > data.length - swingLookback - 1) {
+      return false;
+    }
+    const window = data.slice(index - swingLookback, index + swingLookback + 1);
+    const targetLow = data[index].low;
+    return window.every(
+      (bar, idx) => idx === swingLookback || targetLow <= bar.low
+    );
+  };
+
+  const findSourceCandle = (breakIndex: number, type: OrderBlockType) => {
+    const start = Math.max(0, breakIndex - maxSourceLookback);
+    for (let i = breakIndex - 1; i >= start; i -= 1) {
+      const bar = data[i];
+      const isOpposite =
+        type === "buy" ? bar.close < bar.open : bar.close > bar.open;
+      if (isOpposite) {
+        return i;
+      }
+    }
+    return Math.max(0, breakIndex - 1);
+  };
+
+  const findInvalidationIndex = (
+    sourceIndex: number,
+    zoneLow: number,
+    zoneHigh: number,
+    type: OrderBlockType
+  ) => {
+    for (let i = sourceIndex + 1; i < data.length; i += 1) {
+      const bar = data[i];
+      const isInvalidated =
+        type === "buy" ? bar.close < zoneLow : bar.close > zoneHigh;
+      if (isInvalidated) {
+        return i;
+      }
+    }
+    return data.length - 1;
+  };
+
+  let lastSwingHighIndex: number | null = null;
+  let lastSwingLowIndex: number | null = null;
+
+  for (let i = 0; i < data.length; i += 1) {
+    if (isSwingHigh(i)) {
+      lastSwingHighIndex = i;
+    }
+    if (isSwingLow(i)) {
+      lastSwingLowIndex = i;
+    }
+
+    const bar = data[i];
+
+    if (lastSwingHighIndex !== null) {
+      const swingHigh = data[lastSwingHighIndex];
+      const breakPct = (bar.close - swingHigh.high) / swingHigh.high;
+      const brokeUp =
+        breakPct >= minimumBreakoutPercent && bar.close > swingHigh.high;
+      if (brokeUp) {
+        const sourceIndex = findSourceCandle(i, "buy");
+        const sourceBar = data[sourceIndex];
+        const zoneLow = sourceBar.low;
+        const zoneHigh = sourceBar.open;
+        const endIndex = findInvalidationIndex(
+          sourceIndex,
+          zoneLow,
+          zoneHigh,
+          "buy"
+        );
+        zones.push({
+          type: "buy",
+          startIndex: sourceIndex,
+          endIndex,
+          startTime: data[sourceIndex].date,
+          endTime: data[endIndex].date,
+          low: Math.min(zoneLow, zoneHigh),
+          high: Math.max(zoneLow, zoneHigh),
+        });
+        lastSwingHighIndex = null;
+      }
+    }
+
+    if (lastSwingLowIndex !== null) {
+      const swingLow = data[lastSwingLowIndex];
+      const breakPct = (swingLow.low - bar.close) / swingLow.low;
+      const brokeDown =
+        breakPct >= minimumBreakoutPercent && bar.close < swingLow.low;
+      if (brokeDown) {
+        const sourceIndex = findSourceCandle(i, "sell");
+        const sourceBar = data[sourceIndex];
+        const zoneLow = sourceBar.open;
+        const zoneHigh = sourceBar.high;
+        const endIndex = findInvalidationIndex(
+          sourceIndex,
+          zoneLow,
+          zoneHigh,
+          "sell"
+        );
+        zones.push({
+          type: "sell",
+          startIndex: sourceIndex,
+          endIndex,
+          startTime: data[sourceIndex].date,
+          endTime: data[endIndex].date,
+          low: Math.min(zoneLow, zoneHigh),
+          high: Math.max(zoneLow, zoneHigh),
+        });
+        lastSwingLowIndex = null;
+      }
+    }
+  }
+
+  return zones;
+}
+
+/**
  * Calculate all indicators for a dataset
  */
 export function calculateAllIndicators(data: OHLCV[]) {
@@ -153,5 +340,6 @@ export function calculateAllIndicators(data: OHLCV[]) {
     ema100: calculateEMA(close, 100),
     bollinger: calculateBollingerBands(close, 20, 2.0),
     stochastic: calculateStochastic(high, low, close, 5, 3, 3),
+    orderBlocks: calculateOrderBlocks(data),
   };
 }

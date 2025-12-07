@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
 import { calculateHalvingSignals } from "@/lib/halving-signals";
-import { OHLCV } from "@/lib/indicators";
+import { OHLCV, OrderBlockZone } from "@/lib/indicators";
 import { format } from "date-fns";
 import { IChartApi, ISeriesApi } from "lightweight-charts";
 import { useMemo, useRef } from "react";
@@ -31,6 +31,7 @@ interface BitcoinChartProps {
       k: number[];
       d: number[];
     };
+    orderBlocks: OrderBlockZone[];
   };
   halvingDates?: string[];
   isLoadingHalvingDates?: boolean;
@@ -175,6 +176,8 @@ export default function BitcoinChart({
     });
   }, [data, indicators, halvingDates, fearGreedData]);
 
+  const orderBlocks = indicators.orderBlocks || [];
+
   if (isLoadingHalvingDates || !chartData.length) {
     return (
       <Empty className="border">
@@ -207,23 +210,15 @@ export default function BitcoinChart({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Main Price Chart with Stochastic Oscillator in Panes */}
-      <div className="bg-card rounded-lg p-4 border space-y-6">
-        <h2 className="text-xl font-bold text-card-foreground mb-4 text-center">
-          Bitcoin (BTC-USD) with Volume, Stochastic Oscillator & Fear and Greed
-          Index
-        </h2>
-        <CandlestickChart
-          data={chartData}
-          onChartReady={(chart) => {
-            btcChartRef.current = chart;
-          }}
-          onSeriesReady={(series) => {
-            btcCandlestickSeriesRef.current = series;
-          }}
-        />
-      </div>
-    </div>
+    <CandlestickChart
+      data={chartData}
+      orderBlocks={orderBlocks}
+      onChartReady={(chart) => {
+        btcChartRef.current = chart;
+      }}
+      onSeriesReady={(series) => {
+        btcCandlestickSeriesRef.current = series;
+      }}
+    />
   );
 }

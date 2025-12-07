@@ -1,7 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { OrderBlockZone } from "@/lib/indicators";
 import {
+  BaselineSeries,
   CandlestickData,
   CandlestickSeries,
   ColorType,
@@ -47,6 +49,7 @@ interface CandlestickChartProps {
     topSignalLabel?: string;
     bottomSignalLabel?: string;
   }>;
+  orderBlocks?: OrderBlockZone[];
   onChartReady?: (chart: IChartApi) => void;
   onSeriesReady?: (series: ISeriesApi<"Candlestick">) => void;
 }
@@ -61,6 +64,7 @@ export const TOTAL_CHART_HEIGHT = 900;
 
 export default function CandlestickChart({
   data,
+  orderBlocks,
   onChartReady,
   onSeriesReady,
 }: CandlestickChartProps) {
@@ -87,6 +91,7 @@ export default function CandlestickChart({
   const fearGreedGreedLineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const fearGreedExtremeGreedLineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const [isLogarithmic, setIsLogarithmic] = useState(false);
+  const orderBlockSeriesRef = useRef<Array<ISeriesApi<"Baseline">>>([]);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -514,6 +519,7 @@ export default function CandlestickChart({
     const fearGreedNeutralData: LineData<Time>[] = [];
     const fearGreedGreedData: LineData<Time>[] = [];
     const fearGreedExtremeGreedData: LineData<Time>[] = [];
+    const zones = orderBlocks || [];
 
     // Minimum value for logarithmic scale to avoid log(0) or log(negative) issues
     const MIN_LOG_VALUE = 0.01;
@@ -626,6 +632,48 @@ export default function CandlestickChart({
     fearGreedGreedLineRef.current?.setData(fearGreedGreedData);
     fearGreedExtremeGreedLineRef.current?.setData(fearGreedExtremeGreedData);
 
+    // Draw order block zones as shaded baseline series on the price pane
+    zones.forEach((zone) => {
+      if (!chartRef.current) return;
+
+      const isBuy = zone.type === "buy";
+      const basePrice = isBuy ? zone.low : zone.high;
+      const drawPrice = isBuy ? zone.high : zone.low;
+      const color = isBuy ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)";
+      const startTime = Math.floor(
+        new Date(zone.startTime).getTime() / 1000
+      ) as Time;
+      const endTime = Math.floor(
+        new Date(zone.endTime).getTime() / 1000
+      ) as Time;
+
+      const series = chartRef.current.addSeries(BaselineSeries, {
+        baseValue: { type: "price", price: basePrice },
+        topFillColor1: color,
+        topFillColor2: color,
+        bottomFillColor1: color,
+        bottomFillColor2: color,
+        topLineColor: "transparent",
+        bottomLineColor: "transparent",
+        lineWidth: 1,
+        priceFormat: {
+          type: "price",
+          precision: 2,
+          minMove: 0.01,
+        },
+        lastValueVisible: false,
+        priceLineVisible: false,
+      });
+
+      const zoneData: LineData<Time>[] = [
+        { time: startTime, value: drawPrice },
+        { time: endTime, value: drawPrice },
+      ];
+
+      series.setData(zoneData);
+      orderBlockSeriesRef.current.push(series);
+    });
+
     // Add markers for halving dates and signals
     type ChartMarker = {
       time: Time;
@@ -700,7 +748,7 @@ export default function CandlestickChart({
 
     // Fit content
     chartRef.current.timeScale().fitContent();
-  }, [data, isLogarithmic]);
+  }, [data, isLogarithmic, orderBlocks]);
 
   // Apply logarithmic scale mode when state changes
   useEffect(() => {
