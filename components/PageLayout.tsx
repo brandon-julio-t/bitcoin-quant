@@ -1,7 +1,13 @@
+import { ScrollArea } from "./ui/scroll-area";
+
 interface PageLayoutProps {
   children: React.ReactNode;
 }
 
 export function PageLayout({ children }: PageLayoutProps) {
-  return <main className="min-h-screen p-6">{children}</main>;
+  return (
+    <ScrollArea className="h-svh w-full">
+      <main className="m-6">{children}</main>
+    </ScrollArea>
+  );
 }
