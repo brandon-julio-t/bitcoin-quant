@@ -124,3 +124,7 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 }
+
+@utility debug {
+  @apply border-2! border-red-600!;
+}
