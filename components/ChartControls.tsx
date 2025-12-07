@@ -25,9 +25,9 @@ export default function ChartControls({
   loadingStates = {},
 }: ChartControlsProps) {
   return (
-    <div className="space-y-4 mb-6">
+    <div className="mb-6 space-y-4">
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-foreground">Timeframe</label>
+        <label className="text-foreground text-sm font-medium">Timeframe</label>
         <div className="flex gap-2">
           {TIMEFRAMES.map((tf) => {
             const isLoading = loadingStates[tf.value] ?? false;
@@ -36,7 +36,7 @@ export default function ChartControls({
                 key={tf.value}
                 variant={timeframe === tf.value ? "default" : "outline"}
                 onClick={() => onTimeframeChange(tf.value)}
-                className="flex-1 relative"
+                className="relative flex-1"
               >
                 <span className="flex items-center justify-center gap-2">
                   {isLoading && (
