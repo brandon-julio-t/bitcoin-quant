@@ -368,12 +368,12 @@ export default function CandlestickChart({
     // Note: Price scale for pane 1 will be auto-configured based on the series data
     // The stochastic series will automatically use the right price scale of pane 1
 
-    // Create Fear and Greed Index series in pane 2
+    // Create Fear and Greed Index series in pane 2 (contrarian colors)
     // Extreme Fear line (25)
     const fearGreedExtremeFearLine = chart.addSeries(
       LineSeries,
       {
-        color: "#dc2626",
+        color: "#16a34a",
         lineWidth: 1,
         lineStyle: 1, // Dashed
         title: "",
@@ -393,7 +393,7 @@ export default function CandlestickChart({
     const fearGreedFearLine = chart.addSeries(
       LineSeries,
       {
-        color: "#ea580c",
+        color: "#22c55e",
         lineWidth: 1,
         lineStyle: 1, // Dashed
         title: "",
@@ -433,7 +433,7 @@ export default function CandlestickChart({
     const fearGreedGreedLine = chart.addSeries(
       LineSeries,
       {
-        color: "#16a34a",
+        color: "#ea580c",
         lineWidth: 1,
         lineStyle: 1, // Dashed
         title: "",
@@ -448,6 +448,26 @@ export default function CandlestickChart({
       2 // Pane index 2
     );
     fearGreedGreedLineRef.current = fearGreedGreedLine;
+
+    // Extreme Greed line (100)
+    const fearGreedExtremeGreedLine = chart.addSeries(
+      LineSeries,
+      {
+        color: "#dc2626",
+        lineWidth: 1,
+        lineStyle: 1, // Dashed
+        title: "",
+        priceFormat: {
+          type: "price",
+          precision: 0,
+          minMove: 1,
+        },
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      2 // Pane index 2
+    );
+    fearGreedExtremeGreedLineRef.current = fearGreedExtremeGreedLine;
 
     // Fear and Greed Index line
     const fearGreedSeries = chart.addSeries(
@@ -608,7 +628,8 @@ export default function CandlestickChart({
       fearGreedFearData.push({ time: timestamp, value: 45 });
       fearGreedNeutralData.push({ time: timestamp, value: 55 });
       fearGreedGreedData.push({ time: timestamp, value: 75 });
-      fearGreedExtremeGreedData.push({ time: timestamp, value: 100 });
+      // Use 90 for extreme greed to reflect realistic ceiling
+      fearGreedExtremeGreedData.push({ time: timestamp, value: 90 });
     });
 
     // Set data to series
