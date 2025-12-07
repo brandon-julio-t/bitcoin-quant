@@ -11,5 +11,3 @@ export const TIMEFRAME_LABELS: Record<(typeof TIMEFRAMES)[number], string> = {
   "1w": "1 Week",
   "1m": "1 Month",
 };
-
-export const APP_TITLE = "Bitcoin Quant Indicators";
