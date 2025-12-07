@@ -8,6 +8,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
+import { Timeframe } from "@/lib/constants";
 import { calculateHalvingSignals } from "@/lib/halving-signals";
 import { OHLCV, OrderBlockZone } from "@/lib/indicators";
 import { format } from "date-fns";
@@ -37,6 +38,7 @@ interface BitcoinChartProps {
   isLoadingHalvingDates?: boolean;
   halvingDatesError?: Error | null;
   fearGreedData?: Map<string, { value: number; classification: string }>;
+  timeframe: Timeframe;
 }
 
 /**
@@ -50,6 +52,7 @@ export default function BitcoinChart({
   isLoadingHalvingDates = false,
   halvingDatesError,
   fearGreedData,
+  timeframe,
 }: BitcoinChartProps) {
   const btcChartRef = useRef<IChartApi | null>(null);
   const btcCandlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(
@@ -213,6 +216,7 @@ export default function BitcoinChart({
     <CandlestickChart
       data={chartData}
       orderBlocks={orderBlocks}
+      timeframe={timeframe}
       onChartReady={(chart) => {
         btcChartRef.current = chart;
       }}

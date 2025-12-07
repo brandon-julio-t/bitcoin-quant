@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Timeframe, TIMEFRAME_FOCUS_WINDOWS_DAYS } from "@/lib/constants";
 import { OrderBlockZone } from "@/lib/indicators";
 import {
   BaselineSeries,
@@ -50,6 +51,7 @@ interface CandlestickChartProps {
     bottomSignalLabel?: string;
   }>;
   orderBlocks?: OrderBlockZone[];
+  timeframe: Timeframe;
   onChartReady?: (chart: IChartApi) => void;
   onSeriesReady?: (series: ISeriesApi<"Candlestick">) => void;
 }
@@ -65,6 +67,7 @@ export const TOTAL_CHART_HEIGHT = 900;
 export default function CandlestickChart({
   data,
   orderBlocks,
+  timeframe,
   onChartReady,
   onSeriesReady,
 }: CandlestickChartProps) {
@@ -519,6 +522,32 @@ export default function CandlestickChart({
   useEffect(() => {
     if (!data.length || !chartRef.current) return;
 
+    const applyFocusRange = () => {
+      if (!chartRef.current) return false;
+
+      const windowDays = TIMEFRAME_FOCUS_WINDOWS_DAYS[timeframe];
+      if (!windowDays) return false;
+
+      const lastPoint = data[data.length - 1];
+      if (!lastPoint) return false;
+
+      const lastDate = new Date(lastPoint.date);
+      const targetStart = new Date(lastDate);
+      targetStart.setDate(targetStart.getDate() - windowDays);
+
+      const earliestDate = new Date(data[0].date);
+      const effectiveStart =
+        targetStart.getTime() < earliestDate.getTime()
+          ? earliestDate
+          : targetStart;
+
+      const from = Math.floor(effectiveStart.getTime() / 1000) as Time;
+      const to = Math.floor(lastDate.getTime() / 1000) as Time;
+
+      chartRef.current.timeScale().setVisibleRange({ from, to });
+      return true;
+    };
+
     // Convert data to TradingView format
     const candlestickData: CandlestickData<Time>[] = [];
     const ema13Data: LineData<Time>[] = [];
@@ -767,9 +796,11 @@ export default function CandlestickChart({
       }
     }
 
-    // Fit content
-    chartRef.current.timeScale().fitContent();
-  }, [data, isLogarithmic, orderBlocks]);
+    const focusApplied = applyFocusRange();
+    if (!focusApplied) {
+      chartRef.current.timeScale().fitContent();
+    }
+  }, [data, isLogarithmic, orderBlocks, timeframe]);
 
   // Apply logarithmic scale mode when state changes
   useEffect(() => {

@@ -190,6 +190,7 @@ export default async function Home() {
                   isLoadingHalvingDates={false}
                   halvingDatesError={null}
                   fearGreedData={fearGreedMap}
+                  timeframe={tf}
                 />
               ) : (
                 <Empty className="border">
