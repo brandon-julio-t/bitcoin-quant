@@ -52,6 +52,7 @@ interface CandlestickChartProps {
   }>;
   orderBlocks?: OrderBlockZone[];
   timeframe: Timeframe;
+  chartHeight: number;
   onChartReady?: (chart: IChartApi) => void;
   onSeriesReady?: (series: ISeriesApi<"Candlestick">) => void;
 }
@@ -61,13 +62,11 @@ interface CandlestickChartProps {
  * Displays candlestick data with EMAs, Bollinger Bands, and signal markers
  */
 
-// Centralized pane height configuration
-export const TOTAL_CHART_HEIGHT = 900;
-
 export default function CandlestickChart({
   data,
   orderBlocks,
   timeframe,
+  chartHeight,
   onChartReady,
   onSeriesReady,
 }: CandlestickChartProps) {
@@ -95,6 +94,9 @@ export default function CandlestickChart({
   const fearGreedExtremeGreedLineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const [isLogarithmic, setIsLogarithmic] = useState(false);
   const orderBlockSeriesRef = useRef<Array<ISeriesApi<"Baseline">>>([]);
+
+  // Centralized pane height configuration
+  const TOTAL_CHART_HEIGHT = chartHeight;
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -493,8 +495,8 @@ export default function CandlestickChart({
 
     // Configure all pane heights after series creation
     const panes = chart.panes();
-    panes[0]?.setStretchFactor(3);
-    panes[1]?.setStretchFactor(1.2);
+    panes[0]?.setStretchFactor(5);
+    panes[1]?.setStretchFactor(1);
     panes[2]?.setStretchFactor(1);
 
     // Handle resize
@@ -516,7 +518,7 @@ export default function CandlestickChart({
         chartRef.current = null;
       }
     };
-  }, [onChartReady, onSeriesReady, isLogarithmic]);
+  }, [onChartReady, onSeriesReady, isLogarithmic, TOTAL_CHART_HEIGHT]);
 
   // Update chart data when data prop changes
   useEffect(() => {

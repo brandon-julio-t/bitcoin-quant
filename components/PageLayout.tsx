@@ -7,7 +7,7 @@ interface PageLayoutProps {
 export function PageLayout({ children }: PageLayoutProps) {
   return (
     <ScrollArea className="h-svh w-full">
-      <main className="m-6">{children}</main>
+      <main className="m-6 mb-0">{children}</main>
     </ScrollArea>
   );
 }

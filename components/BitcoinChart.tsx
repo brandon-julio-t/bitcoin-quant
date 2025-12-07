@@ -14,6 +14,7 @@ import { OHLCV, OrderBlockZone } from "@/lib/indicators";
 import { format } from "date-fns";
 import { IChartApi, ISeriesApi } from "lightweight-charts";
 import { useMemo, useRef } from "react";
+import { useIsClient, useScreen } from "usehooks-ts";
 import CandlestickChart from "./CandlestickChart";
 
 interface BitcoinChartProps {
@@ -181,6 +182,22 @@ export default function BitcoinChart({
 
   const orderBlocks = indicators.orderBlocks || [];
 
+  const screen = useScreen();
+  const isClient = useIsClient();
+
+  if (halvingDatesError) {
+    return (
+      <Empty className="border">
+        <EmptyHeader>
+          <EmptyTitle>Error loading halving dates</EmptyTitle>
+          <EmptyDescription>
+            Failed to fetch Bitcoin halving dates. Please try again later.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
   if (isLoadingHalvingDates || !chartData.length) {
     return (
       <Empty className="border">
@@ -199,14 +216,15 @@ export default function BitcoinChart({
     );
   }
 
-  if (halvingDatesError) {
+  if (!screen || !isClient) {
     return (
       <Empty className="border">
         <EmptyHeader>
-          <EmptyTitle>Error loading halving dates</EmptyTitle>
-          <EmptyDescription>
-            Failed to fetch Bitcoin halving dates. Please try again later.
-          </EmptyDescription>
+          <EmptyMedia>
+            <Spinner />
+          </EmptyMedia>
+          <EmptyTitle>Loading UI</EmptyTitle>
+          <EmptyDescription>Loading UI...</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
@@ -217,6 +235,7 @@ export default function BitcoinChart({
       data={chartData}
       orderBlocks={orderBlocks}
       timeframe={timeframe}
+      chartHeight={screen.availHeight - 250}
       onChartReady={(chart) => {
         btcChartRef.current = chart;
       }}
