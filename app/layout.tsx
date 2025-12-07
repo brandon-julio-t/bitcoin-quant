@@ -1,3 +1,6 @@
+import { cn } from "@/lib/utils";
+import { GeistMono } from "geist/font/mono";
+import { GeistSans } from "geist/font/sans";
 import type { Metadata } from "next";
 import "./globals.css";
 
@@ -14,7 +17,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className="bg-background text-foreground">{children}</body>
+      <body className={cn(GeistSans.variable, GeistMono.variable)}>
+        {children}
+      </body>
     </html>
   );
 }
